@@ -1,0 +1,6 @@
+-keepattributes *Annotation*
+-dontwarn okio.**
+-dontwarn com.wireguard.**
+-keep class com.wireguard.config.** { *; }
+-keep class com.wireguard.android.backend.** { *; }
+-keep class com.rescuevpn.app.data.model.** { *; }
