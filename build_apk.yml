@@ -1,4 +1,4 @@
-name: github/workflows/build_apk.yml
+name: .github/workflows/build_apk.yml
 
 on:
   push:
