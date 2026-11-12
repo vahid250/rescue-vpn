@@ -20,7 +20,14 @@ object WireGuardValidator {
      */
     @Throws(Exception::class)
     fun validateAndParse(id: String, name: String, rawContent: String): WireGuardProfile {
-        val cleanContent = rawContent.trim()
+        // Remove UTF-8 BOM and the known non-WireGuard metadata line sometimes
+        // appended by third-party config providers. Preserve all actual WG directives.
+        val cleanContent = rawContent
+            .removePrefix("\uFEFF")
+            .lineSequence()
+            .filterNot { it.trim().startsWith("VPN Accelerator", ignoreCase = true) }
+            .joinToString("\n")
+            .trim()
         if (cleanContent.isBlank()) {
             throw IllegalArgumentException("متن کانفیگ نمی‌تواند خالی باشد.")
         }
