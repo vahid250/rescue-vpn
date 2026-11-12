@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">R&amp;MA</string>
+    <string name="vpn_channel_name">وضعیت تونل WireGuard</string>
+    <string name="vpn_channel_desc">نمایش اعلان اتصال فعال یا قطع تونل امن WireGuard</string>
+</resources>
