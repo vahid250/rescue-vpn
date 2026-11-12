@@ -10,12 +10,12 @@ class WireGuardConfigTest {
     fun validateAndParse_validConfig_succeeds() {
         val validConf = """
             [Interface]
-            PrivateKey = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=
+            PrivateKey = AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=
             Address = 10.0.0.2/32
             DNS = 1.1.1.1, 9.9.9.9
 
             [Peer]
-            PublicKey = bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb=
+            PublicKey = ISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0A=
             Endpoint = 185.143.232.1:53
             AllowedIPs = 0.0.0.0/0
         """.trimIndent()
