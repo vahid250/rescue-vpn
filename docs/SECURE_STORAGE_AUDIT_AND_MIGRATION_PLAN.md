@@ -175,3 +175,56 @@ An actual GitHub Actions unit-test build exposed three Kotlin compilation issues
 3. `MainViewModel` used `ProfileIdGenerator` without importing its model package. The missing import was added.
 
 These are source corrections, not a passing test claim. A newer CI run is queued/running against the corrected branch; unit tests, emulator instrumentation, lint, and APK assembly remain unverified until that run completes successfully.
+
+## Production-wiring gate: profile lifecycle and tunnel identity review
+
+A follow-up source review of `SecureConfigStore`, `MainViewModel`,
+`RescueWireGuardService`, and the isolated metadata codec identified additional
+requirements that must be met before enabling fixed-egress metadata in the
+production path.
+
+1. **Bind metadata to the exact WireGuard configuration, not only its profile ID.**
+   The current AES-GCM AAD binds the encrypted record to the profile ID and
+   envelope version. This rejects moving ciphertext between profile IDs, but
+   does not distinguish a replacement WireGuard configuration that reuses the
+   same profile ID. Before integration, include the SHA-256 digest of the
+   normalized WireGuard configuration in the authenticated context and verify
+   it on every metadata read. The digest is an identity check, not an
+   authentication mechanism by itself; the AES-GCM tag authenticates the AAD.
+2. **Carry the stable profile ID into the service command.**
+   `MainViewModel.connect()` currently sends only the display name and raw
+   configuration to `RescueWireGuardService`. The service therefore cannot
+   independently verify that a start request matches the pinned profile.
+   Add a profile-ID field to the serialized start command and enforce the
+   validated pin in both the ViewModel selection path and the service command
+   consumer. Do not rely on a UI-only gate.
+3. **Define fail-closed metadata error handling.**
+   An absent metadata record means an ordinary standard profile. A present
+   record that cannot be authenticated, decoded, or decrypted because its
+   Keystore key is unavailable must not be treated as absent or silently
+   downgraded to standard mode. Surface a clear security error and block the
+   affected start/switch operation.
+4. **Make deletion and wipe lifecycle-safe.**
+   Profile deletion must remove its metadata record as well as its WireGuard
+   record, with a defined failure order so a metadata deletion error does not
+   leave an orphaned fixed-egress policy or silently remove the user's config.
+   Wipe-all must account for all metadata records before clearing the legacy
+   vault. The metadata store must not create a Keystore key just to check or
+   delete a profile that has no metadata record.
+5. **Preserve current user data during migration.**
+   The existing encrypted preference store remains the source of truth until a
+   separate migration can copy, read back, validate, and durably mark every
+   profile and the selected profile. Do not combine metadata integration with
+   replacement of the existing config vault.
+6. **Report damaged profiles instead of silently hiding them.**
+   `MainViewModel.loadProfiles()` currently catches parse errors and drops
+   those entries from the in-memory list. A later storage-health path should
+   distinguish a malformed WireGuard configuration from encrypted-store
+   corruption or Keystore failure without logging or displaying private-key
+   material.
+
+The pure `ProfilePinningPolicy` and its unit tests are not production
+enforcement. The service currently serializes tunnel operations but has no
+profile-ID or metadata-pin validation. Fixed-egress UI and pinning remain
+disabled until the above gates and their unit/instrumentation tests are
+implemented and pass.
