@@ -19,8 +19,7 @@ internal class AndroidKeystoreMetadataKeyProvider(
     private val alias: String = KEY_ALIAS
 ) : MetadataKeyProvider {
 
-    @Synchronized
-    override fun getExistingKey(): SecretKey? {
+    override fun getExistingKey(): SecretKey? = synchronized(KEY_ACCESS_LOCK) {
         require(alias.isNotBlank()) { "Keystore alias must not be blank." }
         try {
             val keyStore = loadKeyStore()
@@ -38,9 +37,8 @@ internal class AndroidKeystoreMetadataKeyProvider(
         }
     }
 
-    @Synchronized
-    override fun getOrCreateKey(): SecretKey {
-        getExistingKey()?.let { return it }
+    override fun getOrCreateKey(): SecretKey = synchronized(KEY_ACCESS_LOCK) {
+        getExistingKey()?.let { return@synchronized it }
         try {
             val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
             generator.init(
@@ -54,7 +52,7 @@ internal class AndroidKeystoreMetadataKeyProvider(
                     .setKeySize(KEY_SIZE_BITS)
                     .build()
             )
-            return generator.generateKey()
+            generator.generateKey()
         } catch (error: Exception) {
             throw SecurityException("Android Keystore could not create the fixed-egress metadata key.", error)
         }
@@ -64,6 +62,7 @@ internal class AndroidKeystoreMetadataKeyProvider(
         KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
     private companion object {
+        val KEY_ACCESS_LOCK = Any()
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
         const val KEY_ALIAS = "com.rescuevpn.app.fixed_egress_metadata.v1"
         const val KEY_SIZE_BITS = 256
