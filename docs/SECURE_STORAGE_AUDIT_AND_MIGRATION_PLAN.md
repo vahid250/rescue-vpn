@@ -164,3 +164,14 @@ Added Android instrumentation dependencies and `MetadataKeystoreAtomicFileInstru
 The device test has been committed but not executed here. It must be run on supported Android API levels/devices before production integration. Process-wide locks do not claim cross-process coordination; the application must keep this store in its normal single-process execution model unless cross-process use is explicitly designed and tested.
 
 The storage remains isolated from current WireGuard profile persistence and tunnel lifecycle. No migration or production wiring has been enabled.
+
+
+## CI feedback and source corrections
+
+An actual GitHub Actions unit-test build exposed three Kotlin compilation issues in the development branch:
+
+1. The Android `AtomicFile` API does not expose the `exists()` call used in the first adapter draft. The adapter now uses `openRead()` and handles `FileNotFoundException` for an absent record.
+2. `FreeServerFinderScreen` imported `ColumnScope.weight` as though it were a public top-level extension. The invalid import was removed; the call remains in its valid `ColumnScope` receiver context.
+3. `MainViewModel` used `ProfileIdGenerator` without importing its model package. The missing import was added.
+
+These are source corrections, not a passing test claim. A newer CI run is queued/running against the corrected branch; unit tests, emulator instrumentation, lint, and APK assembly remain unverified until that run completes successfully.
