@@ -149,6 +149,11 @@ private fun ProviderCard(
                 Icon(Icons.Default.OpenInNew, contentDescription = null, tint = Color.White)
                 Text("مشاهده منبع رسمی", modifier = Modifier.padding(start = 6.dp), color = Color.White)
             }
+            provider.setupGuideUrl?.let { guideUrl ->
+                androidx.compose.material3.OutlinedButton(onClick = { onOpen(guideUrl) }) {
+                    Text("راهنمای راه‌اندازی WireGuard")
+                }
+            }
         }
     }
 }
