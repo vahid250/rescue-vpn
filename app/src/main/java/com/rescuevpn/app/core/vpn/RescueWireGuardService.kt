@@ -49,17 +49,19 @@ class RescueWireGuardService : Service() {
         super.onCreate()
         try {
             backend = GoBackend(applicationContext)
-            commandJob = serviceScope.launch {
-                for (command in commands) {
-                    when (command) {
-                        is Command.Start -> handleStart(command.name, command.rawConfig)
-                        is Command.Stop -> handleStop(command.startId)
-                    }
-                }
-            }
         } catch (e: Exception) {
             TunnelStateManager.setLastError("خطا در بارگذاری موتور GoBackend: ${e.localizedMessage}")
             TunnelStateManager.setState(VpnConnectionState.FAILED)
+        }
+        // Start the consumer even if backend initialization failed, so commands
+        // are acknowledged and reported instead of silently accumulating in the channel.
+        commandJob = serviceScope.launch {
+            for (command in commands) {
+                when (command) {
+                    is Command.Start -> handleStart(command.name, command.rawConfig)
+                    is Command.Stop -> handleStop(command.startId)
+                }
+            }
         }
     }
 
