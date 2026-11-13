@@ -10,6 +10,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import android.provider.OpenableColumns
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,6 +39,36 @@ fun ConfigManagementScreen(
     var configNameInput by remember { mutableStateOf("") }
     var configContentInput by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val fileName = context.contentResolver.query(
+                    uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+                    } else null
+                } ?: "wireguard.conf"
+
+                val content = context.contentResolver.openInputStream(uri)?.use { input ->
+                    BufferedReader(InputStreamReader(input, Charsets.UTF_8)).readText()
+                } ?: throw IllegalStateException("خواندن فایل انتخاب‌شده ممکن نشد.")
+
+                if (content.isBlank()) {
+                    throw IllegalArgumentException("فایل انتخاب‌شده خالی است.")
+                }
+
+                configNameInput = fileName.removeSuffix(".conf").removeSuffix(".txt")
+                configContentInput = content
+                errorMessage = null
+            } catch (e: Exception) {
+                errorMessage = e.localizedMessage ?: "خواندن فایل ناموفق بود."
+            }
+        }
+    }
 
     Scaffold(
         containerColor = BgDark,
@@ -125,10 +161,23 @@ fun ConfigManagementScreen(
                         label = { Text("نام سرور / کانفیگ") },
                         modifier = Modifier.fillMaxWidth()
                     )
+                    OutlinedButton(
+                        onClick = { filePicker.launch(arrayOf("*/*")) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.FolderOpen, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("انتخاب فایل کانفیگ از گوشی")
+                    }
+                    Text(
+                        text = "فایل .conf یا فایل متنی کانفیگ WireGuard را انتخاب کنید؛ محتوا خودکار وارد می‌شود.",
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
                     OutlinedTextField(
                         value = configContentInput,
                         onValueChange = { configContentInput = it },
-                        label = { Text("محتوای استاندارد ([Interface] ...)") },
+                        label = { Text("محتوای کانفیگ WireGuard") },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(150.dp),
