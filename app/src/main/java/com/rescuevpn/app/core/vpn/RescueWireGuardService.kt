@@ -136,18 +136,21 @@ class RescueWireGuardService : Service() {
             val tunnel = object : Tunnel {
                 override fun getName(): String = name
                 override fun onStateChange(newState: Tunnel.State) {
-                    if (currentTunnel !== this) return
-                    when (newState) {
-                        Tunnel.State.UP -> {
-                            TunnelStateManager.setState(VpnConnectionState.CONNECTED)
-                            updateNotification("اینترفیس WireGuard فعال است؛ وضعیت handshake جداگانه بررسی می‌شود")
-                            startTimer()
+                    val callbackTunnel = this
+                    serviceScope.launch(Dispatchers.Main.immediate) {
+                        if (currentTunnel !== callbackTunnel) return@launch
+                        when (newState) {
+                            Tunnel.State.UP -> {
+                                TunnelStateManager.setState(VpnConnectionState.CONNECTED)
+                                updateNotification("اینترفیس WireGuard فعال است؛ وضعیت handshake جداگانه بررسی می‌شود")
+                                startTimer()
+                            }
+                            Tunnel.State.DOWN -> {
+                                TunnelStateManager.setState(VpnConnectionState.DISCONNECTED)
+                                stopTimer()
+                            }
+                            Tunnel.State.TOGGLE -> Unit
                         }
-                        Tunnel.State.DOWN -> {
-                            TunnelStateManager.setState(VpnConnectionState.DISCONNECTED)
-                            stopTimer()
-                        }
-                        Tunnel.State.TOGGLE -> Unit
                     }
                 }
             }
