@@ -6,8 +6,9 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
 
 /**
- * ذخیره‌سازی رمزنگاری‌شده با Android KeyStore سخت‌افزاری.
- * مهم: به هیچ‌وجه در صورت خطا داده‌ها را به متن ساده یا حافظه ناامن منتقل نمی‌کند.
+ * ذخیره‌سازی رمزنگاری‌شده با EncryptedSharedPreferences و کلید مدیریت‌شده
+ * توسط Android Keystore. سخت‌افزاری بودن کلید بدون بررسی KeyInfo تضمین نشده است.
+ * در صورت خطا، هیچ مسیر جایگزین متن‌ساده‌ای استفاده نمی‌شود.
  */
 class SecureConfigStore(context: Context) {
 
