@@ -29,6 +29,8 @@ class RescueWireGuardService : Service() {
     private var timerJob: Job? = null
     private var statsJob: Job? = null
     private var startJob: Job? = null
+    // Keep only the latest profile request while a backend transition is in progress.
+    private var pendingStart: Pair<String, String>? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -63,13 +65,17 @@ class RescueWireGuardService : Service() {
     }
 
     private fun startTunnel(name: String, rawConfig: String) {
+        // Do not lose a profile change that arrives while GoBackend is switching.
+        // The newest request wins; it is applied immediately after the current transition.
+        if (startJob?.isActive == true) {
+            pendingStart = name to rawConfig
+            return
+        }
+
         TunnelStateManager.setState(VpnConnectionState.CONNECTING)
         TunnelStateManager.setLastError(null)
         TunnelStateManager.setActiveConfigName(name)
         startForeground(1001, buildNotification("در حال برقراری هندشیک WireGuard..."))
-
-        // Ignore duplicate taps while the backend is still starting.
-        if (startJob?.isActive == true) return
 
         val existingBackend = backend
         val previousTunnel = currentTunnel
@@ -137,7 +143,12 @@ class RescueWireGuardService : Service() {
                     }
                 } finally {
                     withContext(Dispatchers.Main) {
-                        if (currentTunnel === tunnel) startJob = null
+                        if (currentTunnel === tunnel) {
+                            startJob = null
+                            val next = pendingStart
+                            pendingStart = null
+                            if (next != null) startTunnel(next.first, next.second)
+                        }
                     }
                 }
             }
@@ -151,6 +162,7 @@ class RescueWireGuardService : Service() {
     }
 
     private fun stopTunnel() {
+        pendingStart = null
         stopTimer()
         stopStatsPolling()
         try {
