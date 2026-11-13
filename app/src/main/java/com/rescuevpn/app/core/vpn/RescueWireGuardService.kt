@@ -175,7 +175,7 @@ class RescueWireGuardService : Service() {
             }
             if (previousStillUp && previous != null) {
                 currentTunnel = previous
-                TunnelStateManager.setActiveConfigName(previous.name)
+                TunnelStateManager.setActiveConfigName(previous.getName())
                 TunnelStateManager.setState(VpnConnectionState.CONNECTED)
                 startTimer()
                 startStatsPolling(previous, activeBackend)
