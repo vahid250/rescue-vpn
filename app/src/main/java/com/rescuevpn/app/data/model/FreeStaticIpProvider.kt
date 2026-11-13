@@ -9,8 +9,10 @@ data class FreeStaticIpProvider(
     val name: String,
     val status: String,
     val summary: String,
+    val computeOptions: String,
     val ipBehavior: String,
     val limitations: String,
+    val lastReviewed: String,
     val officialUrl: String,
     val searchTerms: List<String>
 )
@@ -23,8 +25,10 @@ object FreeStaticIpProviderCatalog {
             name = "Oracle Cloud Always Free",
             status = "رایگان مشروط",
             summary = "ماشین مجازی Always Free به‌همراه امکان تخصیص IPv4 عمومی؛ مناسب‌ترین گزینهٔ فعلی برای آزمایش شخصی WireGuard.",
-            ipBehavior = "IPv4 عمومی نمونهٔ E2.1.Micro تا زمانی که همان نمونه و تخصیص IP برقرار باشد قابل استفاده است؛ این IP رزروشدهٔ قابل‌انتقال و تضمین‌شده پس از حذف/تعویض VM نیست.",
+            computeOptions = "دو مسیر محاسباتی در سهمیهٔ رایگان: VM.Standard.E2.1.Micro (AMD، حدود 1 GB RAM و 1/8 OCPU) یا سهمیهٔ OCI Ampere A1 Flex (ARM، مجموعاً تا 2 OCPU و 12 GB RAM؛ قابل تقسیم بین VMها). هر دو برای اجرای WireGuard روی لینوکس قابل بررسی‌اند؛ سازگاری معماری image و اسکریپت نصب باید رعایت شود.",
+            ipBehavior = "E2.1.Micro در مستندات رسمی یک IP عمومی و تا 50 Mbps پهنای باند اینترنت دارد. آدرس عمومی متصل به VM را IP رزروشدهٔ قابل‌انتقال و تضمین‌شده پس از حذف/تعویض VM فرض نکنید؛ نوع تخصیص را در کنسول بررسی کنید.",
             limitations = "ظرفیت منطقهٔ خانگی ممکن است موجود نباشد؛ ثبت‌نام و تأیید هویت/کارت ممکن است لازم باشد؛ منابع Always Free کم‌استفاده ممکن است طبق سیاست Oracle بازیابی شوند. شرایط و هزینهٔ ترافیک را پیش از ساخت VM بررسی کنید.",
+            lastReviewed = "2026-11-14",
             officialUrl = "https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm",
             searchTerms = listOf("oracle", "oci", "always free", "wireguard", "ipv4", "vps", "رایگان", "اوراکل", "آی پی ثابت")
         ),
@@ -33,8 +37,10 @@ object FreeStaticIpProviderCatalog {
             name = "Google Cloud Free Tier",
             status = "برای IPv4 ثابت رایگان نیست",
             summary = "طرح رایگان VM دارد، اما IPv4 عمومی متصل به VM معمولی مشمول هزینهٔ ساعتی است؛ بنابراین گزینهٔ رایگانِ IP ثابت محسوب نمی‌شود.",
+            computeOptions = "Free Tier VM به‌تنهایی به معنی IPv4 عمومی رایگان نیست.",
             ipBehavior = "Google امکان رزرو IPv4 ثابت را می‌دهد، ولی IP عمومی در حال استفاده روی VM استاندارد طبق جدول رسمی قیمت‌گذاری هزینه دارد.",
             limitations = "پیش از ایجاد هر منبع، قیمت منطقه و هزینهٔ IP و ترافیک را بررسی کنید. این مورد در نتایج گزینه‌های رایگان پیشنهادی قرار نمی‌گیرد.",
+            lastReviewed = "2026-11-14",
             officialUrl = "https://cloud.google.com/vpc/pricing",
             searchTerms = listOf("google", "gcp", "static ip", "ipv4", "cloud", "رایگان", "گوگل")
         )
