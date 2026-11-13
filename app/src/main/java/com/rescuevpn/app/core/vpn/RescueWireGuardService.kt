@@ -56,8 +56,16 @@ class RescueWireGuardService : Service() {
         // Start the consumer even if backend initialization failed, so commands
         // are acknowledged and reported instead of silently accumulating in the channel.
         commandJob = serviceScope.launch {
-            for (command in commands) {
-                when (command) {
+            for (firstCommand in commands) {
+                // Collapse requests that arrived during the previous transition.
+                // The newest user intent wins: a final Stop cancels queued starts,
+                // while a later Start intentionally supersedes an earlier Stop.
+                var latestCommand = firstCommand
+                while (true) {
+                    val queued = commands.tryReceive().getOrNull() ?: break
+                    latestCommand = queued
+                }
+                when (val command = latestCommand) {
                     is Command.Start -> handleStart(command.name, command.rawConfig)
                     is Command.Stop -> handleStop(command.startId)
                 }
