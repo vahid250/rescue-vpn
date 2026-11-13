@@ -73,7 +73,7 @@ data class FixedEgressMetadata(
             if (octets.size != 4) return false
 
             val numbers = octets.map { part ->
-                if (part.isEmpty() || part.any { !it.isDigit() }) return false
+                if (part.isEmpty() || part.any { it !in '0'..'9' }) return false
                 if (part.length > 1 && part.startsWith('0')) return false
                 part.toIntOrNull()?.takeIf { it in 0..255 } ?: return false
             }
