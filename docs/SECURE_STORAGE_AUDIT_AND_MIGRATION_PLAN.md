@@ -153,3 +153,14 @@ This is still an isolated metadata store. It is not wired into the UI, `SecureCo
 The product requirement is to retain Persian and add at least ten widely used languages. The initial proposed language set for a later localization phase is English, Arabic, Turkish, Urdu, Hindi, Simplified Chinese, Spanish, French, German, Russian, and Portuguese. This is a planning baseline, not a claim that translations have been completed.
 
 Before implementation, perform a complete UI string inventory (including Compose hard-coded text, notifications, errors, accessibility labels, and import/export messages), move user-visible text into Android string resources, and establish locale fallback and RTL layout tests. Then add professionally reviewed translations, an in-app language choice where appropriate, plural/number/date formatting, and screenshot/regression coverage. Arabic and Urdu require explicit RTL validation; Chinese requires Simplified Chinese locale handling. Localization must not alter VPN protocol, profile data, or security behavior.
+
+
+## Concurrency hardening and Android device-test coverage
+
+Follow-up review identified that instance-level synchronization alone would not serialize writes made through two separately constructed metadata-store or key-provider objects. The implementation now uses process-wide locks for metadata record operations and for access/first-use creation of the dedicated Keystore alias. This prevents same-process instances from racing through the check-then-create or read-modify-write paths.
+
+Added Android instrumentation dependencies and `MetadataKeystoreAtomicFileInstrumentedTest`. On a real Android test target, this test checks that the alias is absent before first use, is created on demand, remains readable, and can protect a metadata record stored and read back through the Android AtomicFile adapter. It cleans up its unique test alias and record after execution.
+
+The device test has been committed but not executed here. It must be run on supported Android API levels/devices before production integration. Process-wide locks do not claim cross-process coordination; the application must keep this store in its normal single-process execution model unless cross-process use is explicitly designed and tested.
+
+The storage remains isolated from current WireGuard profile persistence and tunnel lifecycle. No migration or production wiring has been enabled.
