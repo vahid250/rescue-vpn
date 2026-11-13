@@ -11,7 +11,6 @@ import com.rescuevpn.app.data.model.WireGuardValidator
 import com.rescuevpn.app.data.security.SecureConfigStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import java.util.UUID
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -70,7 +69,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addProfile(name: String, rawContent: String): Pair<Boolean, String?> {
-        val newId = UUID.randomUUID().toString().take(8)
+        val newId = ProfileIdGenerator.newId()
         return try {
             val parsed = WireGuardValidator.validateAndParse(newId, name, rawContent)
             configStore.saveConfig(parsed.id, parsed.name, parsed.rawText)
