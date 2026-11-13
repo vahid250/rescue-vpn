@@ -11,13 +11,14 @@ import javax.crypto.SecretKey
  * This store is deliberately separate from SecureConfigStore: it does not read,
  * rewrite, migrate, or delete existing WireGuard configuration records.
  */
+private object MetadataRecordStoreLock
+
 internal class EncryptedMetadataRecordStore(
     private val files: AtomicRecordFileFactory,
     private val keyProvider: MetadataKeyProvider,
     private val codec: EncryptedMetadataRecordCodec = EncryptedMetadataRecordCodec()
 ) {
-    @Synchronized
-    fun save(profileId: String, metadata: FixedEgressMetadata) {
+    fun save(profileId: String, metadata: FixedEgressMetadata) = synchronized(MetadataRecordStoreLock) {
         val file = files.forProfile(profileId)
         val existing = file.read()
         val key = if (existing == null) {
@@ -37,8 +38,7 @@ internal class EncryptedMetadataRecordStore(
         }
     }
 
-    @Synchronized
-    fun load(profileId: String): FixedEgressMetadata? {
+    fun load(profileId: String): FixedEgressMetadata? = synchronized(MetadataRecordStoreLock) {
         val bytes = files.forProfile(profileId).read() ?: return null
         if (bytes.size > MAX_ENVELOPE_BYTES) {
             throw SecurityException("Encrypted metadata record exceeds the size limit.")
@@ -48,8 +48,7 @@ internal class EncryptedMetadataRecordStore(
         return codec.decrypt(profileId, decodeEnvelope(bytes), key)
     }
 
-    @Synchronized
-    fun delete(profileId: String) {
+    fun delete(profileId: String) = synchronized(MetadataRecordStoreLock) {
         val file = files.forProfile(profileId)
         if (file.read() != null && keyProvider.getExistingKey() == null) {
             throw SecurityException("Encrypted metadata exists but its Keystore key is missing; refusing an unauthenticated delete.")
