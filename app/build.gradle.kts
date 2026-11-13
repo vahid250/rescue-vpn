@@ -74,7 +74,7 @@ dependencies {
     implementation("com.wireguard.android:tunnel:1.0.20260102")
 
     // ذخیره‌سازی امن با Android KeyStore
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.security:security-crypto:1.1.0")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
