@@ -19,21 +19,23 @@ internal class AndroidKeystoreMetadataKeyProvider(
     private val alias: String = KEY_ALIAS
 ) : MetadataKeyProvider {
 
-    override fun getExistingKey(): SecretKey? = synchronized(KEY_ACCESS_LOCK) {
-        require(alias.isNotBlank()) { "Keystore alias must not be blank." }
-        try {
-            val keyStore = loadKeyStore()
-            if (!keyStore.containsAlias(alias)) return null
-            return keyStore.getKey(alias, null) as? SecretKey
-                ?: throw SecurityException("The existing metadata key is unavailable or has an unexpected type.")
+    override fun getExistingKey(): SecretKey? {
+        return synchronized(KEY_ACCESS_LOCK) {
+            require(alias.isNotBlank()) { "Keystore alias must not be blank." }
+            try {
+                val keyStore = loadKeyStore()
+                if (!keyStore.containsAlias(alias)) return@synchronized null
+                keyStore.getKey(alias, null) as? SecretKey
+                    ?: throw SecurityException("The existing metadata key is unavailable or has an unexpected type.")
         } catch (error: KeyPermanentlyInvalidatedException) {
             throw SecurityException("The fixed-egress metadata key was invalidated; encrypted records cannot be opened.", error)
         } catch (error: UnrecoverableKeyException) {
             throw SecurityException("The existing fixed-egress metadata key cannot be recovered.", error)
         } catch (error: SecurityException) {
             throw error
-        } catch (error: Exception) {
-            throw SecurityException("Android Keystore could not read the fixed-egress metadata key.", error)
+            } catch (error: Exception) {
+                throw SecurityException("Android Keystore could not read the fixed-egress metadata key.", error)
+            }
         }
     }
 
