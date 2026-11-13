@@ -1,6 +1,8 @@
 package com.rescuevpn.app
 
 import com.rescuevpn.app.data.model.WireGuardValidator
+import com.rescuevpn.app.core.vpn.TunnelCommand
+import com.rescuevpn.app.core.vpn.TunnelCommandPolicy
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -66,4 +68,39 @@ class WireGuardConfigTest {
     fun validateAndParse_invalidConfig_throwsException() {
         WireGuardValidator.validateAndParse("p_err", "نامعتبر", "invalid content without peer")
     }
+    @Test
+    fun latestTunnelCommand_rapidProfileSwitches_keepsOnlyNewestStart() {
+        val result = TunnelCommandPolicy.latest(
+            listOf(
+                TunnelCommand.Start("A", "config-A"),
+                TunnelCommand.Start("B", "config-B"),
+                TunnelCommand.Start("C", "config-C")
+            )
+        )
+        assertEquals(TunnelCommand.Start("C", "config-C"), result)
+    }
+
+    @Test
+    fun latestTunnelCommand_finalStop_cancelsQueuedStarts() {
+        val result = TunnelCommandPolicy.latest(
+            listOf(
+                TunnelCommand.Start("A", "config-A"),
+                TunnelCommand.Start("B", "config-B"),
+                TunnelCommand.Stop(42)
+            )
+        )
+        assertEquals(TunnelCommand.Stop(42), result)
+    }
+
+    @Test
+    fun latestTunnelCommand_startAfterStop_representsNewestUserIntent() {
+        val result = TunnelCommandPolicy.latest(
+            listOf(
+                TunnelCommand.Stop(42),
+                TunnelCommand.Start("C", "config-C")
+            )
+        )
+        assertEquals(TunnelCommand.Start("C", "config-C"), result)
+    }
+
 }
