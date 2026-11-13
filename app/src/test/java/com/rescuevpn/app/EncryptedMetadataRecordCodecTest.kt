@@ -52,8 +52,10 @@ class EncryptedMetadataRecordCodecTest {
         val encrypted = codec.encrypt("profile-a", fixedMetadata, key)
         val lines = encrypted.split('\n').toMutableList()
         val field = lines[3]
-        val last = field.last()
-        lines[3] = field.dropLast(1) + if (last == 'A') "B" else "A"
+        val prefixLength = "ciphertext=".length
+        val replacementCharacter = if (field[prefixLength] == 'A') "B" else "A"
+        lines[3] = field.substring(0, prefixLength) +
+            replacementCharacter + field.substring(prefixLength + 1)
         assertThrows(SecurityException::class.java) {
             codec.decrypt("profile-a", lines.joinToString("\n"), key)
         }
