@@ -21,6 +21,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val activeConfigName: StateFlow<String?> = TunnelStateManager.activeConfigName
     val lastError: StateFlow<String?> = TunnelStateManager.lastError
     val durationSeconds: StateFlow<Long> = TunnelStateManager.connectedDurationSeconds
+    val receivedBytes: StateFlow<Long> = TunnelStateManager.receivedBytes
+    val sentBytes: StateFlow<Long> = TunnelStateManager.sentBytes
+    val lastHandshakeMillis: StateFlow<Long> = TunnelStateManager.lastHandshakeMillis
 
     private val _profiles = MutableStateFlow<List<WireGuardProfile>>(emptyList())
     val profiles: StateFlow<List<WireGuardProfile>> = _profiles
