@@ -39,6 +39,9 @@ class MainActivity : ComponentActivity() {
                 val profiles by viewModel.profiles.collectAsState()
                 val selectedId by viewModel.selectedProfileId.collectAsState()
                 val duration by viewModel.durationSeconds.collectAsState()
+                val receivedBytes by viewModel.receivedBytes.collectAsState()
+                val sentBytes by viewModel.sentBytes.collectAsState()
+                val lastHandshakeMillis by viewModel.lastHandshakeMillis.collectAsState()
                 val lastError by viewModel.lastError.collectAsState()
 
                 val selectedProfile = profiles.firstOrNull { it.id == selectedId }
@@ -49,6 +52,9 @@ class MainActivity : ComponentActivity() {
                             state = connectionState,
                             selectedProfile = selectedProfile,
                             durationSeconds = duration,
+                            receivedBytes = receivedBytes,
+                            sentBytes = sentBytes,
+                            lastHandshakeMillis = lastHandshakeMillis,
                             lastError = lastError,
                             onConnectToggle = {
                                 if (connectionState == VpnConnectionState.CONNECTED) {
