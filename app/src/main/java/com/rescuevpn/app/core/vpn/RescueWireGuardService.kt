@@ -164,9 +164,31 @@ class RescueWireGuardService : Service() {
             activeConfigFingerprint = fingerprint
             startStatsPolling(tunnel, activeBackend)
         } catch (e: Exception) {
-            currentTunnel = null
-            activeConfigFingerprint = null
-            failStart(e)
+            // Parsing can fail before the old tunnel is touched. If it is still UP,
+            // preserve it and restore truthful UI state instead of orphaning a live tunnel.
+            val previousStillUp = try {
+                previous != null && withContext(Dispatchers.IO) {
+                    activeBackend.getState(previous) == Tunnel.State.UP
+                }
+            } catch (_: Exception) {
+                false
+            }
+            if (previousStillUp && previous != null) {
+                currentTunnel = previous
+                TunnelStateManager.setActiveConfigName(previous.name)
+                TunnelStateManager.setState(VpnConnectionState.CONNECTED)
+                startTimer()
+                startStatsPolling(previous, activeBackend)
+                TunnelStateManager.setLastError(
+                    "تعویض سرور انجام نشد؛ اتصال قبلی حفظ شد. " +
+                        (e.localizedMessage ?: "خطای نامشخص")
+                )
+                updateNotification("اتصال قبلی فعال است؛ تعویض سرور ناموفق بود")
+            } else {
+                currentTunnel = null
+                activeConfigFingerprint = null
+                failStart(e)
+            }
         }
     }
 
