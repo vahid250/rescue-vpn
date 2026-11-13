@@ -30,4 +30,16 @@ class FreeStaticIpProviderCatalogTest {
         assertTrue(google!!.status.contains("رایگان نیست"))
         assertFalse(google.status.contains("رایگان مشروط"))
     }
+    @Test
+    fun oracleCatalogIncludesArmOptionAndReviewDate() {
+        val oracle = FreeStaticIpProviderCatalog.providers.first {
+            it.id == "oracle-always-free"
+        }
+
+        assertTrue(oracle.computeOptions.contains("A1"))
+        assertTrue(oracle.computeOptions.contains("ARM"))
+        assertTrue(oracle.lastReviewed.isNotBlank())
+        assertTrue(oracle.ipBehavior.contains("رزروشده"))
+    }
+
 }
