@@ -11,9 +11,15 @@ import com.wireguard.android.backend.GoBackend
 import com.wireguard.android.backend.Tunnel
 import com.wireguard.config.Config
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
 
+/**
+ * All backend state transitions are processed by one command consumer.
+ * This prevents concurrent UP/DOWN calls from racing when users switch profiles
+ * or disconnect while a start operation is still in progress.
+ */
 class RescueWireGuardService : Service() {
 
     companion object {
@@ -21,21 +27,36 @@ class RescueWireGuardService : Service() {
         const val ACTION_STOP = "com.rescuevpn.app.ACTION_STOP"
         const val EXTRA_CONFIG_RAW = "extra_config_raw"
         const val EXTRA_CONFIG_NAME = "extra_config_name"
+        private const val NOTIFICATION_ID = 1001
+    }
+
+    private sealed interface Command {
+        data class Start(val name: String, val rawConfig: String) : Command
+        data class Stop(val startId: Int) : Command
     }
 
     private var backend: GoBackend? = null
-    private var currentTunnel: Tunnel? = null
-    private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
+    @Volatile private var currentTunnel: Tunnel? = null
+    private val serviceJob = SupervisorJob()
+    private val serviceScope = CoroutineScope(serviceJob + Dispatchers.Main.immediate)
+    private val commands = Channel<Command>(Channel.UNLIMITED)
+    private var commandJob: Job? = null
     private var timerJob: Job? = null
     private var statsJob: Job? = null
-    private var startJob: Job? = null
-    // Keep only the latest profile request while a backend transition is in progress.
-    private var pendingStart: Pair<String, String>? = null
+    private var activeConfigFingerprint: Int? = null
 
     override fun onCreate() {
         super.onCreate()
         try {
             backend = GoBackend(applicationContext)
+            commandJob = serviceScope.launch {
+                for (command in commands) {
+                    when (command) {
+                        is Command.Start -> handleStart(command.name, command.rawConfig)
+                        is Command.Stop -> handleStop(command.startId)
+                    }
+                }
+            }
         } catch (e: Exception) {
             TunnelStateManager.setLastError("خطا در بارگذاری موتور GoBackend: ${e.localizedMessage}")
             TunnelStateManager.setState(VpnConnectionState.FAILED)
@@ -45,56 +66,74 @@ class RescueWireGuardService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
-                val rawConfig = intent.getStringExtra(EXTRA_CONFIG_RAW)
-                val configName = intent.getStringExtra(EXTRA_CONFIG_NAME) ?: "WireGuard"
-                if (rawConfig.isNullOrBlank()) {
+                val raw = intent.getStringExtra(EXTRA_CONFIG_RAW)
+                val name = intent.getStringExtra(EXTRA_CONFIG_NAME) ?: "WireGuard"
+                if (raw.isNullOrBlank()) {
                     TunnelStateManager.setState(VpnConnectionState.NO_CONFIG)
                     TunnelStateManager.setLastError("کانفیگ معتبری برای برقراری تونل ارائه نشده است.")
-                    stopSelf()
                 } else {
-                    startTunnel(configName, rawConfig)
+                    startForeground(NOTIFICATION_ID, buildNotification("در صف برقراری تونل WireGuard..."))
+                    val result = commands.trySend(Command.Start(name, raw))
+                    if (result.isFailure) {
+                        TunnelStateManager.setState(VpnConnectionState.FAILED)
+                        TunnelStateManager.setLastError("صف فرمان‌های اتصال در دسترس نیست.")
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                    }
                 }
             }
             ACTION_STOP -> {
-                stopTunnel()
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                val result = commands.trySend(Command.Stop(startId))
+                if (result.isFailure) {
+                    TunnelStateManager.setLastError("فرمان قطع تونل ثبت نشد؛ لطفاً دوباره تلاش کنید.")
+                }
             }
         }
         return START_NOT_STICKY
     }
 
-    private fun startTunnel(name: String, rawConfig: String) {
-        // Do not lose a profile change that arrives while GoBackend is switching.
-        // The newest request wins; it is applied immediately after the current transition.
-        if (startJob?.isActive == true) {
-            pendingStart = name to rawConfig
-            return
-        }
-
+    private suspend fun handleStart(name: String, rawConfig: String) {
         TunnelStateManager.setState(VpnConnectionState.CONNECTING)
         TunnelStateManager.setLastError(null)
         TunnelStateManager.setActiveConfigName(name)
-        startForeground(1001, buildNotification("در حال برقراری هندشیک WireGuard..."))
+        updateNotification("در حال برقراری تونل WireGuard...")
 
-        val existingBackend = backend
-        val previousTunnel = currentTunnel
+        val activeBackend = backend
+        if (activeBackend == null) {
+            failStart(IllegalStateException("موتور WireGuard آماده نیست"))
+            return
+        }
+
+        val fingerprint = rawConfig.hashCode()
+        val previous = currentTunnel
+        if (previous != null && activeConfigFingerprint == fingerprint) {
+            try {
+                val alreadyUp = withContext(Dispatchers.IO) {
+                    activeBackend.getState(previous) == Tunnel.State.UP
+                }
+                if (alreadyUp) {
+                    startStatsPolling(previous, activeBackend)
+                    TunnelStateManager.setState(VpnConnectionState.CONNECTED)
+                    updateNotification("اینترفیس WireGuard فعال است")
+                    return
+                }
+            } catch (_: Exception) {
+                // Continue with a clean re-apply when state cannot be queried.
+            }
+        }
 
         try {
-            val normalizedConfig = WireGuardValidator.normalizeForWireGuard(rawConfig)
-            val stream = ByteArrayInputStream(normalizedConfig.toByteArray(StandardCharsets.UTF_8))
-            val parsedConfig = Config.parse(stream)
-
+            val normalized = WireGuardValidator.normalizeForWireGuard(rawConfig)
+            val parsed = Config.parse(
+                ByteArrayInputStream(normalized.toByteArray(StandardCharsets.UTF_8))
+            )
             val tunnel = object : Tunnel {
                 override fun getName(): String = name
                 override fun onStateChange(newState: Tunnel.State) {
-                    // Ignore callbacks from a tunnel that has already been replaced.
                     if (currentTunnel !== this) return
                     when (newState) {
                         Tunnel.State.UP -> {
-                            // وضعیت CONNECTED تنها پس از بالا آمدن واقعی اینترفیس در هسته لینوکس
                             TunnelStateManager.setState(VpnConnectionState.CONNECTED)
-                            updateNotification("اینترفیس WireGuard فعال است؛ در انتظار handshake")
+                            updateNotification("اینترفیس WireGuard فعال است؛ وضعیت handshake جداگانه بررسی می‌شود")
                             startTimer()
                         }
                         Tunnel.State.DOWN -> {
@@ -105,78 +144,69 @@ class RescueWireGuardService : Service() {
                     }
                 }
             }
-            val activeBackend = backend ?: throw IllegalStateException("موتور WireGuard آماده نیست")
-            if (currentTunnel === tunnel && activeBackend.getState(tunnel) == Tunnel.State.UP) {
-                startStatsPolling(tunnel, activeBackend)
-                return
-            }
-            currentTunnel = tunnel
 
-            // GoBackend waits for its own VpnService to initialize. Never call setState
-            // on this Service's main thread: doing so can block VpnService.onCreate()
-            // and cause GoBackend's two-second startup timeout on the first attempt.
-            startJob = serviceScope.launch(Dispatchers.IO) {
-                try {
-                    // A selected profile change must replace the running tunnel.
-                    // GoBackend can run only one active tunnel at a time, so stop the
-                    // previous tunnel before starting the newly selected configuration.
-                    if (previousTunnel != null &&
-                        previousTunnel !== tunnel &&
-                        activeBackend.getState(previousTunnel) == Tunnel.State.UP
-                    ) {
-                        activeBackend.setState(previousTunnel, Tunnel.State.DOWN, null)
-                    }
-                    activeBackend.setState(tunnel, Tunnel.State.UP, parsedConfig)
-                    startStatsPolling(tunnel, activeBackend)
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        if (currentTunnel === tunnel) {
-                            TunnelStateManager.setState(VpnConnectionState.FAILED)
-                            val detail = e.localizedMessage?.takeIf { it.isNotBlank() }
-                                ?: "جزئیات بیشتری ارائه نشد"
-                            TunnelStateManager.setLastError(
-                                "خطا در ایجاد تونل (" + e.javaClass.simpleName + "): " + detail
-                            )
-                            stopForeground(STOP_FOREGROUND_REMOVE)
-                            stopSelf()
-                        }
-                    }
-                } finally {
-                    withContext(Dispatchers.Main) {
-                        if (currentTunnel === tunnel) {
-                            startJob = null
-                            val next = pendingStart
-                            pendingStart = null
-                            if (next != null) startTunnel(next.first, next.second)
-                        }
-                    }
+            // Publish the new identity before backend calls so callbacks from the
+            // previous tunnel are ignored from this point onward.
+            currentTunnel = tunnel
+            stopStatsPolling()
+            stopTimer()
+
+            withContext(Dispatchers.IO) {
+                if (previous != null && previous !== tunnel &&
+                    activeBackend.getState(previous) == Tunnel.State.UP
+                ) {
+                    activeBackend.setState(previous, Tunnel.State.DOWN, null)
                 }
+                activeBackend.setState(tunnel, Tunnel.State.UP, parsed)
             }
+            activeConfigFingerprint = fingerprint
+            startStatsPolling(tunnel, activeBackend)
         } catch (e: Exception) {
-            TunnelStateManager.setState(VpnConnectionState.FAILED)
-            val detail = e.localizedMessage?.takeIf { it.isNotBlank() } ?: "جزئیات بیشتری ارائه نشد"
-            TunnelStateManager.setLastError("خطا در ایجاد تونل (" + e.javaClass.simpleName + "): " + detail)
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            currentTunnel = null
+            activeConfigFingerprint = null
+            failStart(e)
         }
     }
 
-    private fun stopTunnel() {
-        pendingStart = null
+    private suspend fun failStart(error: Exception) {
+        stopStatsPolling()
+        stopTimer()
+        TunnelStateManager.setState(VpnConnectionState.FAILED)
+        val detail = error.localizedMessage?.takeIf { it.isNotBlank() } ?: "جزئیات بیشتری ارائه نشد"
+        TunnelStateManager.setLastError(
+            "خطا در ایجاد تونل (${error.javaClass.simpleName}): $detail"
+        )
+        stopForeground(STOP_FOREGROUND_REMOVE)
+    }
+
+    private suspend fun handleStop(startId: Int) {
         stopTimer()
         stopStatsPolling()
-        try {
-            currentTunnel?.let {
-                backend?.setState(it, Tunnel.State.DOWN, null)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        val tunnel = currentTunnel
         currentTunnel = null
-        TunnelStateManager.setState(VpnConnectionState.DISCONNECTED)
-        TunnelStateManager.setActiveConfigName(null)
-        TunnelStateManager.setDuration(0L)
-        TunnelStateManager.resetTraffic()
+        activeConfigFingerprint = null
+        try {
+            if (tunnel != null) {
+                withContext(Dispatchers.IO) {
+                    backend?.setState(tunnel, Tunnel.State.DOWN, null)
+                }
+            }
+            TunnelStateManager.setState(VpnConnectionState.DISCONNECTED)
+            TunnelStateManager.setActiveConfigName(null)
+            TunnelStateManager.setDuration(0L)
+            TunnelStateManager.resetTraffic()
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } catch (e: Exception) {
+            TunnelStateManager.setState(VpnConnectionState.FAILED)
+            TunnelStateManager.setLastError(
+                "قطع تونل کامل نشد (${e.javaClass.simpleName}): " +
+                    (e.localizedMessage ?: "خطای نامشخص")
+            )
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } finally {
+            // Do not destroy the service if a newer start request arrived after this stop.
+            stopSelfResult(startId)
+        }
     }
 
     private fun startStatsPolling(tunnel: Tunnel, activeBackend: GoBackend) {
@@ -191,10 +221,12 @@ class RescueWireGuardService : Service() {
                         .maxOrNull() ?: 0L
                     TunnelStateManager.setTraffic(stats.totalRx(), stats.totalTx(), latestHandshake)
                 } catch (e: Exception) {
-                    TunnelStateManager.setLastError(
-                        "خواندن آمار تونل ناموفق بود (" + e.javaClass.simpleName + "): " +
-                            (e.localizedMessage?.takeIf { it.isNotBlank() } ?: "خطای نامشخص")
-                    )
+                    if (currentTunnel === tunnel) {
+                        TunnelStateManager.setLastError(
+                            "خواندن آمار تونل ناموفق بود (${e.javaClass.simpleName}): " +
+                                (e.localizedMessage?.takeIf { it.isNotBlank() } ?: "خطای نامشخص")
+                        )
+                    }
                 }
                 delay(2000)
             }
@@ -241,14 +273,17 @@ class RescueWireGuardService : Service() {
 
     private fun updateNotification(text: String) {
         val manager = getSystemService(NOTIFICATION_SERVICE) as? android.app.NotificationManager
-        manager?.notify(1001, buildNotification(text))
+        manager?.notify(NOTIFICATION_ID, buildNotification(text))
     }
 
     override fun onBind(intent: Intent?) = null
 
     override fun onDestroy() {
-        stopTunnel()
+        // Never perform a blocking backend DOWN call on the main thread here.
+        // Normal user disconnect is serialized through Command.Stop before stopSelfResult.
+        commands.close()
         serviceScope.cancel()
+        currentTunnel = null
         super.onDestroy()
     }
 }
