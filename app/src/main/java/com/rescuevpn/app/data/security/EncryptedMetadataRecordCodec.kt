@@ -3,7 +3,6 @@ package com.rescuevpn.app.data.security
 import com.rescuevpn.app.data.model.FixedEgressMetadata
 import com.rescuevpn.app.data.model.FixedEgressMetadataCodec
 import java.nio.charset.StandardCharsets
-import java.security.SecureRandom
 import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
@@ -16,16 +15,17 @@ import javax.crypto.spec.GCMParameterSpec
  * This class does not create, persist, rotate, or recover keys and does not
  * provide durable storage. Tests may inject an ephemeral test key.
  */
-internal class EncryptedMetadataRecordCodec(
-    private val secureRandom: SecureRandom = SecureRandom()
-) {
+internal class EncryptedMetadataRecordCodec {
     fun encrypt(profileId: String, metadata: FixedEgressMetadata, key: SecretKey): String {
         require(validProfileId(profileId)) { "Invalid profile ID." }
         val plaintext = FixedEgressMetadataCodec.encode(profileId, metadata)
             .toByteArray(StandardCharsets.UTF_8)
-        val iv = ByteArray(GCM_IV_BYTES).also(secureRandom::nextBytes)
         val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, iv))
+        // Android Keystore requires the provider to generate the GCM IV when
+        // randomized encryption is enforced. Read that IV back after init.
+        cipher.init(Cipher.ENCRYPT_MODE, key)
+        val iv = requireNotNull(cipher.iv) { "Encryption provider did not return a GCM nonce." }
+        require(iv.size == GCM_IV_BYTES) { "Encryption provider returned an invalid GCM nonce length." }
         cipher.updateAAD(associatedData(profileId))
         val ciphertext = cipher.doFinal(plaintext)
 
