@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import com.rescuevpn.app.RescueApp
+import com.rescuevpn.app.data.model.WireGuardValidator
 import com.rescuevpn.app.ui.MainActivity
 import com.wireguard.android.backend.Backend
 import com.wireguard.android.backend.GoBackend
@@ -67,7 +68,8 @@ class RescueWireGuardService : Service() {
         startForeground(1001, buildNotification("در حال برقراری هندشیک WireGuard..."))
 
         try {
-            val stream = ByteArrayInputStream(rawConfig.toByteArray(StandardCharsets.UTF_8))
+            val normalizedConfig = WireGuardValidator.normalizeForWireGuard(rawConfig)
+            val stream = ByteArrayInputStream(normalizedConfig.toByteArray(StandardCharsets.UTF_8))
             val parsedConfig = Config.parse(stream)
 
             val tunnel = object : Tunnel {
