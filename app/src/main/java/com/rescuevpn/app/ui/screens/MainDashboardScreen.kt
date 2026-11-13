@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rescuevpn.app.core.vpn.VpnConnectionState
+import com.rescuevpn.app.core.vpn.HandshakeFreshness
 import com.rescuevpn.app.data.model.WireGuardProfile
 import com.rescuevpn.app.ui.theme.*
 
@@ -38,6 +39,11 @@ fun MainDashboardScreen(
 ) {
     val isConnected = state == VpnConnectionState.CONNECTED
     val isConnecting = state == VpnConnectionState.CONNECTING
+    // durationSeconds changes once per second while connected, so this age display
+    // refreshes even when the peer's last-handshake timestamp itself is unchanged.
+    val nowMillis = System.currentTimeMillis()
+    val handshakeAgeSeconds = HandshakeFreshness.ageSeconds(lastHandshakeMillis, nowMillis)
+    val handshakeIsRecent = HandshakeFreshness.isRecent(lastHandshakeMillis, nowMillis)
 
     val durationText = remember(durationSeconds) {
         val hours = durationSeconds / 3600
@@ -56,14 +62,18 @@ fun MainDashboardScreen(
                         Text(text = "R&MA", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         Text(
                             text = when (state) {
-                                VpnConnectionState.CONNECTED -> if (lastHandshakeMillis > 0L) "Handshake برقرار است؛ ارتباط همتا تأیید شد" else "اینترفیس فعال است؛ هنوز handshake دریافت نشده"
+                                VpnConnectionState.CONNECTED -> when {
+                                    handshakeIsRecent -> "اینترفیس فعال است؛ handshake تازه دریافت شده"
+                                    handshakeAgeSeconds != null -> "اینترفیس فعال است؛ handshake قدیمی است"
+                                    else -> "اینترفیس فعال است؛ هنوز handshake دریافت نشده"
+                                }
                                 VpnConnectionState.CONNECTING -> "در حال برقراری هندشیک..."
                                 VpnConnectionState.NO_CONFIG -> "هیچ سروری تنظیم نشده است"
                                 VpnConnectionState.FAILED -> "خطای اتصال"
                                 VpnConnectionState.DISCONNECTED -> "قطع اتصال"
                             },
                             color = when (state) {
-                                VpnConnectionState.CONNECTED -> if (lastHandshakeMillis > 0L) PrimaryEmerald else WarningAmber
+                                VpnConnectionState.CONNECTED -> if (handshakeIsRecent) PrimaryEmerald else WarningAmber
                                 VpnConnectionState.CONNECTING -> WarningAmber
                                 else -> TextSecondary
                             },
@@ -222,10 +232,12 @@ fun MainDashboardScreen(
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("آمار واقعی WireGuard", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     Text(
-                        text = if (lastHandshakeMillis > 0L) {
-                            "آخرین handshake: " + ((System.currentTimeMillis() - lastHandshakeMillis).coerceAtLeast(0L) / 1000L).toString() + " ثانیه پیش"
-                        } else "آخرین handshake: هنوز ثبت نشده",
-                        color = if (lastHandshakeMillis > 0L) PrimaryEmerald else WarningAmber,
+                        text = when {
+                            handshakeAgeSeconds == null -> "آخرین handshake: هنوز ثبت نشده یا زمان نامعتبر است"
+                            handshakeIsRecent -> "آخرین handshake: ${handshakeAgeSeconds} ثانیه پیش (تازه)"
+                            else -> "آخرین handshake: ${handshakeAgeSeconds} ثانیه پیش (قدیمی)"
+                        },
+                        color = if (handshakeIsRecent) PrimaryEmerald else WarningAmber,
                         fontSize = 12.sp
                     )
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
