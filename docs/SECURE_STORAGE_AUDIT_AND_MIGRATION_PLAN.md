@@ -88,3 +88,16 @@ as the long-term key namespace for per-profile metadata.
 
 This is a compatibility-preserving prerequisite only. It does not yet add
 metadata persistence, alter WireGuard config records, or enable profile pinning.
+
+## Follow-up implementation: strict metadata codec (serialization only)
+
+Added `FixedEgressMetadataCodec` and focused unit tests on the development branch.
+
+- Uses a fixed field order and an explicit record-format version.
+- Encodes text fields as URL-safe Base64 without padding, avoiding delimiter ambiguity and supporting Unicode labels.
+- Binds the serialized record to its profile ID and checks the caller-supplied ID during decode.
+- Rejects unknown/missing/duplicate fields, unsupported format/schema versions, malformed UTF-8/Base64, oversized records, invalid enum values, and metadata that fails the model's semantic validation.
+- Keeps the codec independent of Android APIs and external serialization dependencies, so it can be unit-tested as plain Kotlin.
+- The codec is **not encryption, authentication, or tamper protection**. Its output must not be persisted as plaintext. The future encrypted-record layer must authenticate the profile ID and record format/schema as associated data (AAD).
+
+No production storage writes, reads, migration markers, or service/ViewModel pinning behavior have been changed. Existing WireGuard profile records remain untouched. CI and Android build/test execution are still unverified.
