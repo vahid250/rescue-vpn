@@ -46,7 +46,7 @@ Files:
 - The service marks the connection `CONNECTED` when WireGuard reports `Tunnel.State.UP`; this is a tunnel/interface state, not proof of public egress.
 - RX/TX counters and latest handshake are collected separately. None proves that a public IP matches the expected address.
 - The service currently has no fixed-egress profile ID, no egress-verification state, no active-VPN-network-bound HTTP verifier, and no DNS/IPv6 leak test result.
-- The current tunnel fingerprint is `rawConfig.hashCode()`. A 32-bit Java/Kotlin string hash is not a collision-resistant identity. Different configuration strings can share a hash, so using it as the sole equality test can incorrectly treat a changed configuration as already applied. Replace this with exact comparison or a collision-resistant digest before relying on profile identity or fixed-egress policy.
+- Initial review found the service used `rawConfig.hashCode()`, a 32-bit non-cryptographic hash that can collide. This issue has now been addressed on this branch by computing an in-memory SHA-256 digest of the normalized configuration before the already-active check. A regression test uses the known Java String hash collision pair `Aa` / `BB`. The digest is only an equality aid, not authentication. CI execution is still unverified.
 
 ### 4. Fixed-egress metadata
 
@@ -96,7 +96,7 @@ A stale result must not remain `VERIFIED` after reconnect, profile change, netwo
 
 ## Implementation gates, in order
 
-1. Add a collision-safe configuration identity and tests; verify command serialization and start/stop/switch races.
+1. [Source change added; CI pending] Use SHA-256 over normalized configuration for the in-memory active-config identity; regression tests cover a known 32-bit hash collision. Verify command serialization and start/stop/switch races on CI and device.
 2. Add a pure profile-pinning policy with tests. Enforce it in both ViewModel and service command handling.
 3. Design encrypted, versioned profile metadata storage without changing the legacy raw-config read path. Test crash recovery and key loss before migration.
 4. Add a verifier that uses an explicitly bound socket on the active VPN network, strict HTTPS/TLS validation, short timeouts, response-size limits, narrow parsing, and no secret/device data in requests or logs.
