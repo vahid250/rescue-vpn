@@ -47,6 +47,8 @@ class EncryptedMetadataRecordStoreTest {
 
     @Test fun wrongProfileCannotReadAnotherProfilesRecord() {
         store.save("profile-a", metadata)
+        // Simulate a copied ciphertext record: profile binding must reject it.
+        files.copyRecord("profile-a", "profile-b")
         assertThrows(SecurityException::class.java) { store.load("profile-b") }
     }
 
@@ -82,6 +84,12 @@ class EncryptedMetadataRecordStoreTest {
     private class FakeRecordFileFactory : AtomicRecordFileFactory {
         private val records = mutableMapOf<String, ByteArray>()
         var failNextWrite = false
+
+        fun copyRecord(sourceProfileId: String, targetProfileId: String) {
+            val source = records[sourceProfileId]
+                ?: throw IllegalStateException("Source record does not exist.")
+            records[targetProfileId] = source.copyOf()
+        }
 
         override fun forProfile(profileId: String): AtomicRecordFile = object : AtomicRecordFile {
             override fun read(): ByteArray? = records[profileId]?.copyOf()
