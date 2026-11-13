@@ -133,13 +133,15 @@ private fun ProviderCard(
             Text(provider.name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
             Text(
                 provider.status,
-                color = if (provider.id == "oracle-always-free") PrimaryEmerald else WarningAmber,
+                color = WarningAmber,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 12.sp
             )
             Text(provider.summary, color = TextPrimary, fontSize = 13.sp)
+            Text("منابع محاسباتی: ${provider.computeOptions}", color = TextSecondary, fontSize = 12.sp)
             Text("وضعیت IP: ${provider.ipBehavior}", color = TextSecondary, fontSize = 12.sp)
             Text("محدودیت‌ها: ${provider.limitations}", color = TextSecondary, fontSize = 12.sp)
+            Text("آخرین بررسی مستندات: ${provider.lastReviewed} — وضعیت دسترسی زنده نیست", color = WarningAmber, fontSize = 11.sp)
             Button(
                 onClick = { onOpen(provider.officialUrl) },
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald)
