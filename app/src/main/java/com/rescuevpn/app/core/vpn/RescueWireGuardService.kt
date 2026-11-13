@@ -7,7 +7,6 @@ import android.content.Intent
 import com.rescuevpn.app.RescueApp
 import com.rescuevpn.app.data.model.WireGuardValidator
 import com.rescuevpn.app.ui.MainActivity
-import com.wireguard.android.backend.Backend
 import com.wireguard.android.backend.GoBackend
 import com.wireguard.android.backend.Tunnel
 import com.wireguard.config.Config
@@ -24,10 +23,11 @@ class RescueWireGuardService : Service() {
         const val EXTRA_CONFIG_NAME = "extra_config_name"
     }
 
-    private var backend: Backend? = null
+    private var backend: GoBackend? = null
     private var currentTunnel: Tunnel? = null
     private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
     private var timerJob: Job? = null
+    private var statsJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -79,7 +79,7 @@ class RescueWireGuardService : Service() {
                         Tunnel.State.UP -> {
                             // وضعیت CONNECTED تنها پس از بالا آمدن واقعی اینترفیس در هسته لینوکس
                             TunnelStateManager.setState(VpnConnectionState.CONNECTED)
-                            updateNotification("متصل به: $name (تونل رمزنگاری‌شده فعال)")
+                            updateNotification("اینترفیس WireGuard فعال است؛ در انتظار handshake")
                             startTimer()
                         }
                         Tunnel.State.DOWN -> {
@@ -90,11 +90,18 @@ class RescueWireGuardService : Service() {
                     }
                 }
             }
+            val activeBackend = backend ?: throw IllegalStateException("موتور WireGuard آماده نیست")
+            if (currentTunnel === tunnel && activeBackend.getState(tunnel) == Tunnel.State.UP) {
+                startStatsPolling(tunnel, activeBackend)
+                return
+            }
             currentTunnel = tunnel
-            backend?.setState(tunnel, Tunnel.State.UP, parsedConfig)
+            activeBackend.setState(tunnel, Tunnel.State.UP, parsedConfig)
+            startStatsPolling(tunnel, activeBackend)
         } catch (e: Exception) {
             TunnelStateManager.setState(VpnConnectionState.FAILED)
-            TunnelStateManager.setLastError("خطا در ایجاد تونل: ${e.localizedMessage}")
+            val detail = e.localizedMessage?.takeIf { it.isNotBlank() } ?: "جزئیات بیشتری ارائه نشد"
+            TunnelStateManager.setLastError("خطا در ایجاد تونل (" + e.javaClass.simpleName + "): " + detail)
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -102,6 +109,7 @@ class RescueWireGuardService : Service() {
 
     private fun stopTunnel() {
         stopTimer()
+        stopStatsPolling()
         try {
             currentTunnel?.let {
                 backend?.setState(it, Tunnel.State.DOWN, null)
@@ -113,6 +121,34 @@ class RescueWireGuardService : Service() {
         TunnelStateManager.setState(VpnConnectionState.DISCONNECTED)
         TunnelStateManager.setActiveConfigName(null)
         TunnelStateManager.setDuration(0L)
+        TunnelStateManager.resetTraffic()
+    }
+
+    private fun startStatsPolling(tunnel: Tunnel, activeBackend: GoBackend) {
+        stopStatsPolling()
+        TunnelStateManager.resetTraffic()
+        statsJob = serviceScope.launch {
+            while (isActive && currentTunnel === tunnel) {
+                try {
+                    val stats = withContext(Dispatchers.IO) { activeBackend.getStatistics(tunnel) }
+                    val latestHandshake = stats.peers()
+                        .mapNotNull { key -> stats.peer(key)?.latestHandshakeEpochMillis() }
+                        .maxOrNull() ?: 0L
+                    TunnelStateManager.setTraffic(stats.totalRx(), stats.totalTx(), latestHandshake)
+                } catch (e: Exception) {
+                    TunnelStateManager.setLastError(
+                        "خواندن آمار تونل ناموفق بود (" + e.javaClass.simpleName + "): " +
+                            (e.localizedMessage?.takeIf { it.isNotBlank() } ?: "خطای نامشخص")
+                    )
+                }
+                delay(2000)
+            }
+        }
+    }
+
+    private fun stopStatsPolling() {
+        statsJob?.cancel()
+        statsJob = null
     }
 
     private fun startTimer() {
