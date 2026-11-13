@@ -27,6 +27,9 @@ fun MainDashboardScreen(
     state: VpnConnectionState,
     selectedProfile: WireGuardProfile?,
     durationSeconds: Long,
+    receivedBytes: Long,
+    sentBytes: Long,
+    lastHandshakeMillis: Long,
     lastError: String?,
     onConnectToggle: () -> Unit,
     onNavigateConfigs: () -> Unit,
@@ -53,14 +56,14 @@ fun MainDashboardScreen(
                         Text(text = "R&MA", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         Text(
                             text = when (state) {
-                                VpnConnectionState.CONNECTED -> "تونل پایدار WireGuard فعال است"
+                                VpnConnectionState.CONNECTED -> if (lastHandshakeMillis > 0L) "Handshake برقرار است؛ ارتباط همتا تأیید شد" else "اینترفیس فعال است؛ هنوز handshake دریافت نشده"
                                 VpnConnectionState.CONNECTING -> "در حال برقراری هندشیک..."
                                 VpnConnectionState.NO_CONFIG -> "هیچ سروری تنظیم نشده است"
                                 VpnConnectionState.FAILED -> "خطای اتصال"
                                 VpnConnectionState.DISCONNECTED -> "قطع اتصال"
                             },
                             color = when (state) {
-                                VpnConnectionState.CONNECTED -> PrimaryEmerald
+                                VpnConnectionState.CONNECTED -> if (lastHandshakeMillis > 0L) PrimaryEmerald else WarningAmber
                                 VpnConnectionState.CONNECTING -> WarningAmber
                                 else -> TextSecondary
                             },
@@ -208,7 +211,38 @@ fun MainDashboardScreen(
                         fontSize = 15.sp
                     )
                 }
+
+            }
+
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+                modifier = Modifier.fillMaxWidth().border(1.dp, BorderSubtle, RoundedCornerShape(14.dp))
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("آمار واقعی WireGuard", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text(
+                        text = if (lastHandshakeMillis > 0L) {
+                            "آخرین handshake: " + ((System.currentTimeMillis() - lastHandshakeMillis).coerceAtLeast(0L) / 1000L).toString() + " ثانیه پیش"
+                        } else "آخرین handshake: هنوز ثبت نشده",
+                        color = if (lastHandshakeMillis > 0L) PrimaryEmerald else WarningAmber,
+                        fontSize = 12.sp
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("دریافت: " + formatTraffic(receivedBytes), color = TextSecondary, fontSize = 12.sp)
+                        Text("ارسال: " + formatTraffic(sentBytes), color = TextSecondary, fontSize = 12.sp)
+                    }
+                }
             }
         }
+    }
+}
+
+private fun formatTraffic(bytes: Long): String {
+    val value = bytes.coerceAtLeast(0L).toDouble()
+    return when {
+        value >= 1024.0 * 1024.0 -> String.format("%.2f MB", value / (1024.0 * 1024.0))
+        value >= 1024.0 -> String.format("%.1f KB", value / 1024.0)
+        else -> bytes.coerceAtLeast(0L).toString() + " B"
     }
 }
