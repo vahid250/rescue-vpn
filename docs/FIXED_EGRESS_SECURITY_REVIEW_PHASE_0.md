@@ -3,7 +3,7 @@
 - Date: 2026-11-14
 - Branch: `rebuild/rma-android-structure`
 - Scope: source-level review of the existing profile store, ViewModel, WireGuard service, tunnel state, manifest, and fixed-egress metadata.
-- Status: review only; no production behavior changed.
+- Status: source review plus one narrowly scoped production hardening change; full CI/device validation pending.
 - Protected branch: `main` must remain untouched.
 
 ## Executive decision
@@ -71,7 +71,7 @@ File: `app/src/main/AndroidManifest.xml`
 | Risk | Why it matters | Required control |
 |---|---|---|
 | Profile identity is lost at service boundary | Service cannot prove which stored profile/policy is active | Carry immutable profile ID and policy version through a validated internal command |
-| 32-bit config fingerprint | Hash collision can skip applying a changed configuration | Exact config equality or SHA-256 digest; never use the digest as authentication |
+| Configuration identity | Original 32-bit hash could collide; source change now uses in-memory SHA-256 over normalized config | Regression test added; CI/device validation still required; digest is not authentication |
 | Tunnel UP shown as CONNECTED | UI may imply internet/IP success when only interface activation is known | Separate tunnel, handshake, egress, and leak-test states |
 | Silent profile parse failures | Existing profiles may appear lost | Report unreadable/invalid records distinctly; never auto-delete |
 | No persisted metadata | Restart may lose pinning policy or expected IP | Versioned encrypted metadata bound to profile ID |
@@ -115,4 +115,4 @@ A stale result must not remain `VERIFIED` after reconnect, profile change, netwo
 
 ## Review conclusion
 
-The safe next coding task is the collision-safe configuration identity and its focused service tests, followed by the pure pinning policy. Do not begin egress networking or storage migration until those foundations are reviewed. The existing encrypted store must remain intact throughout this work.
+The collision-safe in-memory configuration identity and focused regression tests have been added on the development branch, but have not yet been executed by verified CI or on a device. The next safe task is to validate this change and then implement the pure profile-pinning policy with tests. Do not begin egress networking or storage migration until those foundations are reviewed. The existing encrypted store must remain intact throughout this work.
