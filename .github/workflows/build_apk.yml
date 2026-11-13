@@ -38,8 +38,21 @@ jobs:
           gradle-version: "8.9"
       - name: Run unit tests
         run: gradle :app:testDebugUnitTest --stacktrace
+      - name: Android lint
+        run: gradle :app:lintDebug --stacktrace
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
+      - name: Collect merged debug manifest
+        run: |
+          set -euo pipefail
+          find app/build/intermediates -type f -path '*merged_manifest*' -name 'AndroidManifest.xml' -print -exec cp {} app/build/merged-debug-AndroidManifest.xml ;
+          test -s app/build/merged-debug-AndroidManifest.xml
+      - name: Upload merged debug manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: RMA-merged-debug-manifest
+          path: app/build/merged-debug-AndroidManifest.xml
+          if-no-files-found: error
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
