@@ -131,3 +131,25 @@ Validation limitation: these source files were committed and read back from the 
 ## Next gated step
 
 Add an app-private atomic encrypted-record store that composes the metadata codec with this key provider. Before connecting it to the UI or tunnel service, add instrumentation coverage for first-use key creation, reuse of an existing key, wrong-profile AAD rejection, ciphertext tampering, and key invalidation/unavailability. Preserve the current encrypted WireGuard store and do not start migration until crash recovery and read-back validation are demonstrated.
+
+
+## Follow-up implementation: atomic encrypted metadata record store
+
+Added a storage layer dedicated to fixed-egress metadata, separate from the existing WireGuard profile vault.
+
+- `AndroidAtomicRecordFileFactory` stores records under the app's `noBackupFilesDir/fixed_egress_metadata` directory. The filename is a SHA-256 digest of the profile ID; raw profile IDs are not used as filenames.
+- Each record contains only the UTF-8 AES-GCM envelope. The serialized plaintext metadata is never written to disk.
+- Android `AtomicFile` is used for replace/write recovery. A failed write calls `failWrite`, preserving the prior complete file where the platform atomic-file contract permits.
+- Every save reads the record back and authenticates/decrypts it before returning success.
+- Reads of an absent record do not create a key. If ciphertext exists but the Keystore alias is absent/unavailable, load and overwrite fail closed; they do not generate a replacement key.
+- The Keystore provider serializes alias access to reduce concurrent first-use key-generation races.
+- Store operations are synchronized within the store instance. The Android file factory fixes the location to app-private no-backup storage; callers cannot select external storage through this constructor.
+- A storage abstraction permits deterministic unit tests of save/read-back, missing-key behavior, profile binding, delete isolation, and simulated interrupted writes.
+
+This is still an isolated metadata store. It is not wired into the UI, `SecureConfigStore`, profile import/deletion, `MainViewModel`, or the VPN service. It does not migrate or modify existing WireGuard profiles. Android `AtomicFile` behavior and Android Keystore behavior still require instrumentation tests on supported Android devices; local unit tests and CI have not been executed in this environment.
+
+## Localization requirement recorded
+
+The product requirement is to retain Persian and add at least ten widely used languages. The initial proposed language set for a later localization phase is English, Arabic, Turkish, Urdu, Hindi, Simplified Chinese, Spanish, French, German, Russian, and Portuguese. This is a planning baseline, not a claim that translations have been completed.
+
+Before implementation, perform a complete UI string inventory (including Compose hard-coded text, notifications, errors, accessibility labels, and import/export messages), move user-visible text into Android string resources, and establish locale fallback and RTL layout tests. Then add professionally reviewed translations, an in-app language choice where appropriate, plural/number/date formatting, and screenshot/regression coverage. Arabic and Urdu require explicit RTL validation; Chinese requires Simplified Chinese locale handling. Localization must not alter VPN protocol, profile data, or security behavior.
