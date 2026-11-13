@@ -14,14 +14,14 @@ The first version adds a searchable, offline catalog inside R&MA. It filters a s
 
 Official source: https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
 
-Oracle documents Always Free compute shapes, including up to two VM.Standard.E2.1.Micro instances. The E2.1.Micro networking description includes one public IP address and up to 50 Mbps internet bandwidth. This makes it a possible low-cost personal WireGuard gateway candidate.
+Oracle documents two compute paths within the Always Free allowance: up to two VM.Standard.E2.1.Micro instances (AMD, 1 GB RAM and 1/8 OCPU each) or OCI Ampere A1 Flex resources (ARM, up to 2 OCPUs and 12 GB RAM total, subject to the free-tier allocation rules). The E2.1.Micro networking description includes one public IP address and up to 50 Mbps internet bandwidth. A1 networking bandwidth scales with allocated OCPUs. Both are possible personal WireGuard gateway candidates; select a Linux ARM64 image for A1 and verify the architecture of all server packages.
 
 Important qualifications:
 - The Always Free compute instances must be created in the account's home region.
 - Oracle may report temporary host-capacity shortages.
 - Oracle can reclaim idle Always Free compute instances when the published utilization conditions are met.
 - Account verification may require a payment card/phone number for many users.
-- The public IP associated with an instance is not equivalent to a separately reserved, transferable IP. Do not promise that the address survives deletion/replacement of the VM.
+- Do not assume that an instance public IP is a separately reserved, transferable address. Verify the address allocation type and reassignment behavior in the OCI console before relying on it; do not promise that the address survives deletion/replacement of the VM.
 - Confirm current traffic, regional availability, account eligibility, and all possible charges in Oracle's official console before creating resources.
 
 ### Google Cloud Free Tier — not a free static-IPv4 recommendation
@@ -43,5 +43,5 @@ Google documents a Free Tier VM offer, and separately supports reserving static 
 ## Next gates
 
 1. Verify the new screen compiles and existing unit tests remain green in GitHub Actions.
-2. Add a versioned remote catalog only if a trustworthy, authenticated update/distribution design is agreed. Do not fetch arbitrary remote JSON or execute provider-supplied instructions.
+2. Add a versioned remote catalog only with a pinned signing key, signature verification, strict schema/size limits, HTTPS, provider-domain allowlisting, rollback protection, and a safe cached fallback. Do not fetch arbitrary remote JSON or execute provider-supplied instructions.
 3. Before adding a setup wizard, complete the fixed-egress pinning, secure metadata persistence, egress verification, and DNS/IPv6 safety gates already defined in the project ADR.
