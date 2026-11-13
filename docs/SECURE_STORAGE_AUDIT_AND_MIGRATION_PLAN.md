@@ -113,3 +113,21 @@ Added `EncryptedMetadataRecordCodec` with an injected `SecretKey` and focused te
 - Does not write files, change SharedPreferences, or alter existing WireGuard records. It is an isolated cryptographic codec, not a complete storage/migration system.
 
 Before production use, separately review Keystore key creation/alias policy, invalidation/recovery behavior, atomic encrypted-file persistence, crash recovery, and migration. CI execution and Android runtime compatibility remain unverified.
+
+
+## Follow-up implementation: dedicated Android Keystore key provider
+
+Added a separate MetadataKeyProvider contract and an Android implementation for the fixed-egress metadata AES key.
+
+- The key is created lazily, only when a caller requests it; app startup and ordinary WireGuard profile operations do not create this key.
+- Uses the Android Keystore provider with AES-256, GCM mode, no padding, and randomized encryption required.
+- The alias is dedicated to the R&MA fixed-egress metadata format version 1; it is not derived from a profile ID and is not exposed to callers.
+- The key is returned as a SecretKey handle and is never exported as raw key bytes.
+- If the alias already exists but its key is unavailable, invalidated, or has an unexpected type, the provider fails closed. It does not silently replace the key, because doing so would strand ciphertext encrypted under the previous key.
+- The provider is not yet called by SecureConfigStore, MainViewModel, or the VPN service. No metadata record is persisted, no profile pinning is enforced, and existing WireGuard configuration storage remains unchanged.
+
+Validation limitation: these source files were committed and read back from the development branch, but no Android build, unit test, instrumentation test, or physical-device Keystore test has been run in this environment. In particular, hardware-backed key availability is not claimed.
+
+## Next gated step
+
+Add an app-private atomic encrypted-record store that composes the metadata codec with this key provider. Before connecting it to the UI or tunnel service, add instrumentation coverage for first-use key creation, reuse of an existing key, wrong-profile AAD rejection, ciphertext tampering, and key invalidation/unavailability. Preserve the current encrypted WireGuard store and do not start migration until crash recovery and read-back validation are demonstrated.
