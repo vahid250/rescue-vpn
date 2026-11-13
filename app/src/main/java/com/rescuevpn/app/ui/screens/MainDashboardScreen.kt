@@ -34,6 +34,7 @@ fun MainDashboardScreen(
     lastError: String?,
     onConnectToggle: () -> Unit,
     onNavigateConfigs: () -> Unit,
+    onNavigateProviders: () -> Unit,
     onNavigateAbout: () -> Unit,
     onPanicWipe: () -> Unit
 ) {
@@ -83,6 +84,9 @@ fun MainDashboardScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BgDark),
                 actions = {
+                    IconButton(onClick = onNavigateProviders) {
+                        Icon(Icons.Default.Search, contentDescription = "جستجوی سرورهای رایگان", tint = TextSecondary)
+                    }
                     IconButton(onClick = onNavigateAbout) {
                         Icon(Icons.Default.Info, contentDescription = "درباره", tint = TextSecondary)
                     }
