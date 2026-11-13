@@ -13,24 +13,33 @@ import javax.crypto.SecretKey
  *
  * Existing aliases are never replaced automatically: if an existing key is
  * unavailable or invalidated, callers receive a security failure rather than
- * creating a new key that would make existing ciphertext appear recoverable.
+ * creating a key that would make existing ciphertext unreadable.
  */
 internal class AndroidKeystoreMetadataKeyProvider(
     private val alias: String = KEY_ALIAS
 ) : MetadataKeyProvider {
 
-    override fun getOrCreateKey(): SecretKey {
+    override fun getExistingKey(): SecretKey? {
         require(alias.isNotBlank()) { "Keystore alias must not be blank." }
-
         try {
-            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+            val keyStore = loadKeyStore()
+            if (!keyStore.containsAlias(alias)) return null
+            return keyStore.getKey(alias, null) as? SecretKey
+                ?: throw SecurityException("The existing metadata key is unavailable or has an unexpected type.")
+        } catch (error: KeyPermanentlyInvalidatedException) {
+            throw SecurityException("The fixed-egress metadata key was invalidated; encrypted records cannot be opened.", error)
+        } catch (error: UnrecoverableKeyException) {
+            throw SecurityException("The existing fixed-egress metadata key cannot be recovered.", error)
+        } catch (error: SecurityException) {
+            throw error
+        } catch (error: Exception) {
+            throw SecurityException("Android Keystore could not read the fixed-egress metadata key.", error)
+        }
+    }
 
-            if (keyStore.containsAlias(alias)) {
-                val existing = keyStore.getKey(alias, null)
-                return existing as? SecretKey
-                    ?: throw SecurityException("The existing metadata key is unavailable or has an unexpected type.")
-            }
-
+    override fun getOrCreateKey(): SecretKey {
+        getExistingKey()?.let { return it }
+        try {
             val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
             generator.init(
                 KeyGenParameterSpec.Builder(
@@ -44,16 +53,13 @@ internal class AndroidKeystoreMetadataKeyProvider(
                     .build()
             )
             return generator.generateKey()
-        } catch (error: KeyPermanentlyInvalidatedException) {
-            throw SecurityException("The fixed-egress metadata key was invalidated; encrypted records cannot be opened.", error)
-        } catch (error: UnrecoverableKeyException) {
-            throw SecurityException("The existing fixed-egress metadata key cannot be recovered; no replacement was created.", error)
-        } catch (error: SecurityException) {
-            throw error
         } catch (error: Exception) {
-            throw SecurityException("Android Keystore could not provide the fixed-egress metadata key.", error)
+            throw SecurityException("Android Keystore could not create the fixed-egress metadata key.", error)
         }
     }
+
+    private fun loadKeyStore(): KeyStore =
+        KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
     private companion object {
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
