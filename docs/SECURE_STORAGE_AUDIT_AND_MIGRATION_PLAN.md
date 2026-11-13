@@ -228,3 +228,40 @@ enforcement. The service currently serializes tunnel operations but has no
 profile-ID or metadata-pin validation. Fixed-egress UI and pinning remain
 disabled until the above gates and their unit/instrumentation tests are
 implemented and pass.
+
+## Read-only verification of the existing production path
+
+The following source files were re-read on the development branch after the
+latest security-gate review. This section records current behavior; it does not
+change it.
+
+- `SecureConfigStore.saveConfig()` and `deleteConfig()` use encrypted
+  SharedPreferences and `apply()`. `clearAll()` uses `commit()`. No
+  plaintext fallback is present in the inspected class.
+- `MainViewModel.loadProfiles()` currently suppresses per-profile parse
+  exceptions and omits those profiles from the in-memory list. A future
+  diagnostic must preserve the encrypted source entry and must never include
+  raw configuration/private-key text in logs or UI.
+- `MainViewModel.connect()` currently passes only configuration name and raw
+  configuration to the service. It does not pass the stable profile ID.
+- `RescueWireGuardService.TunnelCommand.Start` currently receives name and
+  raw configuration; the serialized consumer therefore cannot validate a
+  customer-owned fixed-egress profile pin independently of the ViewModel.
+- The service's current SHA-256 configuration fingerprint is used to avoid
+  redundant tunnel re-application. It is not an authenticated identity and
+  must not be repurposed as a security decision without binding it to the
+  encrypted metadata authentication context.
+- `MainViewModel.deleteProfile()` deletes the encrypted config entry before
+  reloading profiles and handling an active connection. Any future metadata
+  deletion must define a transactional/recoverable order and must not leave
+  a stale pin that can affect another profile.
+- `MainViewModel.wipeAllData()` requests disconnect and then clears the
+  existing encrypted vault. The metadata store is not currently part of this
+  path; future wipe behavior must explicitly account for it and report
+  partial failure instead of claiming a complete wipe.
+
+**Protection decision:** no edits are being made to `SecureConfigStore`,
+`MainViewModel`, or `RescueWireGuardService` until the isolated metadata
+store passes unit tests, Android instrumentation, lint, debug assembly, and a
+separately reviewed migration/pinning design. Existing WireGuard profile
+storage and tunnel behavior remain the production baseline during this gate.
