@@ -70,7 +70,7 @@ File: `app/build.gradle.kts`
 
 ## Current decision
 
-Audit complete; implementation intentionally deferred. The next safe coding step is to add isolated tests and design the new storage abstraction while preserving the existing production read path. No production storage code has been modified by this audit.
+Source-level audit complete. The isolated metadata serialization layer has now been implemented and tested at source level; the next safe step is an authenticated encryption envelope with injected Keystore key material, followed by a separately reviewed storage adapter. The existing production profile read/write path remains unchanged.
 
 ## Follow-up finding: profile identifier width
 
