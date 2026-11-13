@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onNavigateConfigs = { currentScreen = "configs" },
+                            onNavigateProviders = { currentScreen = "providers" },
                             onNavigateAbout = { currentScreen = "about" },
                             onPanicWipe = {
                                 viewModel.wipeAllData()
@@ -79,6 +80,18 @@ class MainActivity : ComponentActivity() {
                             onAddProfile = { name, content -> viewModel.addProfile(name, content) },
                             onDeleteProfile = { viewModel.deleteProfile(it) },
                             onBack = { currentScreen = "dashboard" }
+                        )
+                    }
+                    "providers" -> {
+                        FreeServerFinderScreen(
+                            onBack = { currentScreen = "dashboard" },
+                            onOpenOfficialSource = { url ->
+                                try {
+                                    startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                                } catch (_: Exception) {
+                                    Toast.makeText(this, "مرورگر برای بازکردن منبع رسمی پیدا نشد.", Toast.LENGTH_SHORT).show()
+                                }
+                            }
                         )
                     }
                     "about" -> {
