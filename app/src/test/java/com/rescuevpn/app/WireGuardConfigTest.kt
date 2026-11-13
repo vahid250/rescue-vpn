@@ -3,6 +3,7 @@ package com.rescuevpn.app
 import com.rescuevpn.app.data.model.WireGuardValidator
 import com.rescuevpn.app.core.vpn.TunnelCommand
 import com.rescuevpn.app.core.vpn.TunnelCommandPolicy
+import com.rescuevpn.app.core.vpn.HandshakeFreshness
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -101,6 +102,27 @@ class WireGuardConfigTest {
             )
         )
         assertEquals(TunnelCommand.Start("C", "config-C"), result)
+    }
+
+    @Test
+    fun handshakeFreshness_recentHandshake_isRecent() {
+        val now = 1_000_000L
+        assertTrue(HandshakeFreshness.isRecent(now - 120_000L, now))
+        assertEquals(120L, HandshakeFreshness.ageSeconds(now - 120_000L, now))
+    }
+
+    @Test
+    fun handshakeFreshness_oldHandshake_isNotRecent() {
+        val now = 1_000_000L
+        assertFalse(HandshakeFreshness.isRecent(now - 181_000L, now))
+    }
+
+    @Test
+    fun handshakeFreshness_missingOrFutureHandshake_isNotRecent() {
+        val now = 1_000_000L
+        assertFalse(HandshakeFreshness.isRecent(0L, now))
+        assertFalse(HandshakeFreshness.isRecent(now + 1L, now))
+        assertNull(HandshakeFreshness.ageSeconds(now + 1L, now))
     }
 
 }
