@@ -71,3 +71,20 @@ File: `app/build.gradle.kts`
 ## Current decision
 
 Audit complete; implementation intentionally deferred. The next safe coding step is to add isolated tests and design the new storage abstraction while preserving the existing production read path. No production storage code has been modified by this audit.
+
+## Follow-up finding: profile identifier width
+
+A source inspection found that newly imported profile IDs were generated with
+`UUID.randomUUID().toString().take(8)`, truncating a UUID to an eight-character
+identifier. This unnecessarily reduces the identifier space and is unsuitable
+as the long-term key namespace for per-profile metadata.
+
+- New profiles now use the complete canonical UUID string.
+- Existing persisted profile IDs are not rewritten, renamed, or migrated.
+- The existing encrypted preference keys remain addressable because their IDs
+  are treated as opaque strings.
+- A focused unit test checks canonical full-UUID shape. CI execution remains
+  unverified; source changes are not a claim that tests passed.
+
+This is a compatibility-preserving prerequisite only. It does not yet add
+metadata persistence, alter WireGuard config records, or enable profile pinning.
