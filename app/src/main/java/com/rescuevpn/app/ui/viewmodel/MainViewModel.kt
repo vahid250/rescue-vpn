@@ -83,11 +83,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteProfile(id: String) {
+        val wasSelected = _selectedProfileId.value == id
         configStore.deleteConfig(id)
-        if (_selectedProfileId.value == id) {
+        if (wasSelected) {
             configStore.saveActiveConfigId(null)
         }
         loadProfiles()
+
+        // If the selected/running profile was removed, never leave the UI pointing
+        // at a deleted profile while its old tunnel continues in the background.
+        if (wasSelected) {
+            when (TunnelStateManager.state.value) {
+                VpnConnectionState.CONNECTED, VpnConnectionState.CONNECTING -> {
+                    if (_selectedProfileId.value != null) connect() else disconnect()
+                }
+                else -> Unit
+            }
+        }
     }
 
     fun connect() {
