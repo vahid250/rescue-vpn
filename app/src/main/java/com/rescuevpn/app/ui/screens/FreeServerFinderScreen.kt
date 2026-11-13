@@ -58,7 +58,10 @@ fun FreeServerFinderScreen(
             normalizedQuery.isBlank() ||
                 provider.name.lowercase().contains(normalizedQuery) ||
                 provider.searchTerms.any { it.lowercase().contains(normalizedQuery) } ||
-                provider.summary.lowercase().contains(normalizedQuery)
+                provider.summary.lowercase().contains(normalizedQuery) ||
+                provider.status.lowercase().contains(normalizedQuery) ||
+                provider.ipBehavior.lowercase().contains(normalizedQuery) ||
+                provider.limitations.lowercase().contains(normalizedQuery)
         }
     }
 
