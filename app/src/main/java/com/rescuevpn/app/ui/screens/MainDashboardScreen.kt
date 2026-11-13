@@ -176,7 +176,7 @@ fun MainDashboardScreen(
                     Text(
                         text = when {
                             isConnected -> "قطع اتصال"
-                            isConnecting -> "در حال هندشیک..."
+                            isConnecting -> "لغو اتصال"
                             else -> "اتصال امن"
                         },
                         color = if (isConnected || isConnecting) Color.White else TextPrimary,
