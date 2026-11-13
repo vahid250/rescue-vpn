@@ -101,3 +101,15 @@ Added `FixedEgressMetadataCodec` and focused unit tests on the development branc
 - The codec is **not encryption, authentication, or tamper protection**. Its output must not be persisted as plaintext. The future encrypted-record layer must authenticate the profile ID and record format/schema as associated data (AAD).
 
 No production storage writes, reads, migration markers, or service/ViewModel pinning behavior have been changed. Existing WireGuard profile records remain untouched. CI and Android build/test execution are still unverified.
+
+## Follow-up implementation: authenticated AES-GCM envelope (no storage integration)
+
+Added `EncryptedMetadataRecordCodec` with an injected `SecretKey` and focused tests.
+
+- Uses the standard JCA transformation `AES/GCM/NoPadding`, a fresh 96-bit nonce from `SecureRandom`, and a 128-bit authentication tag.
+- Authenticated additional data (AAD) binds a domain separator, envelope format version, and exact profile ID. Moving a record to another profile therefore fails authentication.
+- Rejects unsupported envelope versions, non-canonical Base64, invalid nonce/ciphertext lengths, oversized envelopes, malformed fields, and authentication failures.
+- Does not generate or persist keys. Production integration must supply a non-exportable Android Keystore AES key; tests use an ephemeral in-memory test key only.
+- Does not write files, change SharedPreferences, or alter existing WireGuard records. It is an isolated cryptographic codec, not a complete storage/migration system.
+
+Before production use, separately review Keystore key creation/alias policy, invalidation/recovery behavior, atomic encrypted-file persistence, crash recovery, and migration. CI execution and Android runtime compatibility remain unverified.
