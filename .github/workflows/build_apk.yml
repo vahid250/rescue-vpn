@@ -45,7 +45,16 @@ jobs:
       - name: Collect merged debug manifest
         run: |
           set -euo pipefail
-          find app/build/intermediates -type f -path '*merged_manifest*' -name 'AndroidManifest.xml' -print -exec cp {} app/build/merged-debug-AndroidManifest.xml ;
+          manifest_path="app/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml"
+          if [[ ! -s "$manifest_path" ]]; then
+            manifest_path="$(find app/build/intermediates -type f -path '*merged_manifest*' -name 'AndroidManifest.xml' | sort | head -n 1)"
+          fi
+          if [[ -z "$manifest_path" || ! -s "$manifest_path" ]]; then
+            echo "Merged debug AndroidManifest.xml was not found."
+            find app/build/intermediates -type f -name 'AndroidManifest.xml' -print
+            exit 1
+          fi
+          cp "$manifest_path" app/build/merged-debug-AndroidManifest.xml
           test -s app/build/merged-debug-AndroidManifest.xml
       - name: Upload merged debug manifest
         uses: actions/upload-artifact@v4
