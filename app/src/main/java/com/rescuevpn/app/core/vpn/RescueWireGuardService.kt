@@ -67,6 +67,15 @@ class RescueWireGuardService : Service() {
         TunnelStateManager.setActiveConfigName(name)
         startForeground(1001, buildNotification("در حال برقراری هندشیک WireGuard..."))
 
+        val existingBackend = backend
+        val existingTunnel = currentTunnel
+        if (existingBackend != null && existingTunnel != null &&
+            existingBackend.getState(existingTunnel) == Tunnel.State.UP
+        ) {
+            startStatsPolling(existingTunnel, existingBackend)
+            return
+        }
+
         try {
             val normalizedConfig = WireGuardValidator.normalizeForWireGuard(rawConfig)
             val stream = ByteArrayInputStream(normalizedConfig.toByteArray(StandardCharsets.UTF_8))
