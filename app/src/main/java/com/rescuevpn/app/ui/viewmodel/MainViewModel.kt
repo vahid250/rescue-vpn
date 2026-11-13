@@ -62,7 +62,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // If a tunnel is already active, apply the newly selected profile immediately.
         // The service serially stops the old WireGuard tunnel and starts this profile.
-        if (TunnelStateManager.state.value == VpnConnectionState.CONNECTED) {
+        if (TunnelStateManager.state.value == VpnConnectionState.CONNECTED ||
+            TunnelStateManager.state.value == VpnConnectionState.CONNECTING
+        ) {
             connect()
         }
     }
