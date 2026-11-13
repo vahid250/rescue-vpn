@@ -44,6 +44,7 @@ import com.rescuevpn.app.ui.theme.PrimaryEmerald
 import com.rescuevpn.app.ui.theme.SurfaceCard
 import com.rescuevpn.app.ui.theme.TextPrimary
 import com.rescuevpn.app.ui.theme.TextSecondary
+import com.rescuevpn.app.ui.theme.WarningAmber
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -130,7 +131,12 @@ private fun ProviderCard(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(provider.name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Text(provider.status, color = PrimaryEmerald, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+            Text(
+                provider.status,
+                color = if (provider.id == "oracle-always-free") PrimaryEmerald else WarningAmber,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp
+            )
             Text(provider.summary, color = TextPrimary, fontSize = 13.sp)
             Text("وضعیت IP: ${provider.ipBehavior}", color = TextSecondary, fontSize = 12.sp)
             Text("محدودیت‌ها: ${provider.limitations}", color = TextSecondary, fontSize = 12.sp)
