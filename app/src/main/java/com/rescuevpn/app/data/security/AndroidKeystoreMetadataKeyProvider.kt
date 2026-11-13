@@ -19,6 +19,7 @@ internal class AndroidKeystoreMetadataKeyProvider(
     private val alias: String = KEY_ALIAS
 ) : MetadataKeyProvider {
 
+    @Synchronized
     override fun getExistingKey(): SecretKey? {
         require(alias.isNotBlank()) { "Keystore alias must not be blank." }
         try {
@@ -37,6 +38,7 @@ internal class AndroidKeystoreMetadataKeyProvider(
         }
     }
 
+    @Synchronized
     override fun getOrCreateKey(): SecretKey {
         getExistingKey()?.let { return it }
         try {
