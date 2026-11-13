@@ -14,6 +14,7 @@ data class FreeStaticIpProvider(
     val limitations: String,
     val lastReviewed: String,
     val officialUrl: String,
+    val setupGuideUrl: String? = null,
     val searchTerms: List<String>
 )
 
@@ -30,6 +31,7 @@ object FreeStaticIpProviderCatalog {
             limitations = "ظرفیت منطقهٔ خانگی ممکن است موجود نباشد؛ ثبت‌نام و تأیید هویت/کارت ممکن است لازم باشد؛ منابع Always Free کم‌استفاده ممکن است طبق سیاست Oracle بازیابی شوند. شرایط و هزینهٔ ترافیک را پیش از ساخت VM بررسی کنید.",
             lastReviewed = "2026-11-14",
             officialUrl = "https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm",
+            setupGuideUrl = "https://github.com/vahid250/rescue-vpn/blob/rebuild/rma-android-structure/docs/ORACLE_CUSTOMER_OWNED_WIREGUARD_GATEWAY_GUIDE.md",
             searchTerms = listOf("oracle", "oci", "always free", "wireguard", "ipv4", "vps", "رایگان", "اوراکل", "آی پی ثابت")
         ),
         FreeStaticIpProvider(
