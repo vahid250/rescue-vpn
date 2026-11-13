@@ -52,9 +52,8 @@ private class AndroidAtomicRecordFile(
 ) : AtomicRecordFile {
 
     override fun read(): ByteArray? {
-        if (!atomicFile.exists()) return null
         return try {
-            atomicFile.readFully()
+            atomicFile.openRead().use { it.readBytes() }
         } catch (error: FileNotFoundException) {
             null
         }
