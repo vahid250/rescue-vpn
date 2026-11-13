@@ -4,6 +4,9 @@ import javax.crypto.SecretKey
 
 /** Supplies the non-exportable key used by the encrypted metadata codec. */
 internal interface MetadataKeyProvider {
+    /** Returns the existing key, or null only when the alias truly does not exist. */
+    fun getExistingKey(): SecretKey?
+
     /** Creates the key only when absent; must fail closed for an unusable existing key. */
     fun getOrCreateKey(): SecretKey
 }
