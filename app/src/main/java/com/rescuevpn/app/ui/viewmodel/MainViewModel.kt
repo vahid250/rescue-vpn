@@ -59,6 +59,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun selectProfile(id: String) {
         _selectedProfileId.value = id
         configStore.saveActiveConfigId(id)
+
+        // If a tunnel is already active, apply the newly selected profile immediately.
+        // The service serially stops the old WireGuard tunnel and starts this profile.
+        if (TunnelStateManager.state.value == VpnConnectionState.CONNECTED) {
+            connect()
+        }
     }
 
     fun addProfile(name: String, rawContent: String): Pair<Boolean, String?> {
