@@ -28,6 +28,7 @@ class RescueWireGuardService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
     private var timerJob: Job? = null
     private var statsJob: Job? = null
+    private var startJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -67,6 +68,9 @@ class RescueWireGuardService : Service() {
         TunnelStateManager.setActiveConfigName(name)
         startForeground(1001, buildNotification("در حال برقراری هندشیک WireGuard..."))
 
+        // Ignore duplicate taps while the backend is still starting.
+        if (startJob?.isActive == true) return
+
         val existingBackend = backend
         val existingTunnel = currentTunnel
         if (existingBackend != null && existingTunnel != null &&
@@ -105,8 +109,33 @@ class RescueWireGuardService : Service() {
                 return
             }
             currentTunnel = tunnel
-            activeBackend.setState(tunnel, Tunnel.State.UP, parsedConfig)
-            startStatsPolling(tunnel, activeBackend)
+
+            // GoBackend waits for its own VpnService to initialize. Never call setState
+            // on this Service's main thread: doing so can block VpnService.onCreate()
+            // and cause GoBackend's two-second startup timeout on the first attempt.
+            startJob = serviceScope.launch(Dispatchers.IO) {
+                try {
+                    activeBackend.setState(tunnel, Tunnel.State.UP, parsedConfig)
+                    startStatsPolling(tunnel, activeBackend)
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        if (currentTunnel === tunnel) {
+                            TunnelStateManager.setState(VpnConnectionState.FAILED)
+                            val detail = e.localizedMessage?.takeIf { it.isNotBlank() }
+                                ?: "جزئیات بیشتری ارائه نشد"
+                            TunnelStateManager.setLastError(
+                                "خطا در ایجاد تونل (" + e.javaClass.simpleName + "): " + detail
+                            )
+                            stopForeground(STOP_FOREGROUND_REMOVE)
+                            stopSelf()
+                        }
+                    }
+                } finally {
+                    withContext(Dispatchers.Main) {
+                        if (currentTunnel === tunnel) startJob = null
+                    }
+                }
+            }
         } catch (e: Exception) {
             TunnelStateManager.setState(VpnConnectionState.FAILED)
             val detail = e.localizedMessage?.takeIf { it.isNotBlank() } ?: "جزئیات بیشتری ارائه نشد"
