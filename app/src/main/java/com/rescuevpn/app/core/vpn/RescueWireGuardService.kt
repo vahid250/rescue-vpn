@@ -38,7 +38,7 @@ class RescueWireGuardService : Service() {
     private var commandJob: Job? = null
     private var timerJob: Job? = null
     private var statsJob: Job? = null
-    private var activeConfigFingerprint: Int? = null
+    private var activeConfigFingerprint: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -109,7 +109,8 @@ class RescueWireGuardService : Service() {
             return
         }
 
-        val fingerprint = rawConfig.hashCode()
+        val normalized = WireGuardValidator.normalizeForWireGuard(rawConfig)
+        val fingerprint = TunnelConfigIdentity.sha256(normalized)
         val previous = currentTunnel
         if (previous != null && activeConfigFingerprint == fingerprint) {
             try {
@@ -129,7 +130,6 @@ class RescueWireGuardService : Service() {
 
         var attemptedTunnel: Tunnel? = null
         try {
-            val normalized = WireGuardValidator.normalizeForWireGuard(rawConfig)
             val parsed = Config.parse(
                 ByteArrayInputStream(normalized.toByteArray(StandardCharsets.UTF_8))
             )
