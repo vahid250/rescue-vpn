@@ -57,10 +57,10 @@ class MainActivity : ComponentActivity() {
                             lastHandshakeMillis = lastHandshakeMillis,
                             lastError = lastError,
                             onConnectToggle = {
-                                if (connectionState == VpnConnectionState.CONNECTED) {
-                                    viewModel.disconnect()
-                                } else {
-                                    prepareAndConnect()
+                                when (connectionState) {
+                                    VpnConnectionState.CONNECTED,
+                                    VpnConnectionState.CONNECTING -> viewModel.disconnect()
+                                    else -> prepareAndConnect()
                                 }
                             },
                             onNavigateConfigs = { currentScreen = "configs" },
