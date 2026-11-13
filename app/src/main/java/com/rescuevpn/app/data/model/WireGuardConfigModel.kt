@@ -16,18 +16,33 @@ data class WireGuardProfile(
 
 object WireGuardValidator {
     /**
-     * پارس و اعتبارسنجی کانفیگ استاندارد WireGuard با استفاده از کلاس رسمی com.wireguard.config.Config
+     * Removes only the documented provider-specific metadata lines shown in
+     * exported client files. All standard WireGuard directives are preserved.
+     * This function is also used by the connection service for older saved profiles.
+     */
+    fun normalizeForWireGuard(rawContent: String): String {
+        val providerMetadataKeys = setOf(
+            "bouncing",
+            "nat-pmp (port forwarding)",
+            "vpn accelerator"
+        )
+        return rawContent
+            .removePrefix("\uFEFF")
+            .lineSequence()
+            .filterNot { line ->
+                val key = line.substringBefore('=').trim().lowercase()
+                key in providerMetadataKeys
+            }
+            .joinToString("\n")
+            .trim()
+    }
+
+    /**
+     * Parse and validate a standard WireGuard configuration using the official parser.
      */
     @Throws(Exception::class)
     fun validateAndParse(id: String, name: String, rawContent: String): WireGuardProfile {
-        // Remove UTF-8 BOM and the known non-WireGuard metadata line sometimes
-        // appended by third-party config providers. Preserve all actual WG directives.
-        val cleanContent = rawContent
-            .removePrefix("\uFEFF")
-            .lineSequence()
-            .filterNot { it.trim().startsWith("VPN Accelerator", ignoreCase = true) }
-            .joinToString("\n")
-            .trim()
+        val cleanContent = normalizeForWireGuard(rawContent)
         if (cleanContent.isBlank()) {
             throw IllegalArgumentException("متن کانفیگ نمی‌تواند خالی باشد.")
         }
