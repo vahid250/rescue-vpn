@@ -39,13 +39,13 @@ internal class EncryptedMetadataRecordStore(
     }
 
     fun load(profileId: String): FixedEgressMetadata? = synchronized(MetadataRecordStoreLock) {
-        val bytes = files.forProfile(profileId).read() ?: return null
+        val bytes = files.forProfile(profileId).read() ?: return@synchronized null
         if (bytes.size > MAX_ENVELOPE_BYTES) {
             throw SecurityException("Encrypted metadata record exceeds the size limit.")
         }
         val key: SecretKey = keyProvider.getExistingKey()
             ?: throw SecurityException("Encrypted metadata exists but its Keystore key is missing; refusing to generate a replacement.")
-        return codec.decrypt(profileId, decodeEnvelope(bytes), key)
+        codec.decrypt(profileId, decodeEnvelope(bytes), key)
     }
 
     fun delete(profileId: String) = synchronized(MetadataRecordStoreLock) {
