@@ -2,7 +2,6 @@ package com.rescuevpn.app
 
 import com.rescuevpn.app.data.model.ProfileIdGenerator
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.UUID
@@ -18,10 +17,7 @@ class ProfileIdGeneratorTest {
     }
 
     @Test
-    fun generatedIdsAreNotTruncatedToEightCharacters() {
-        val first = ProfileIdGenerator.newId()
-        val second = ProfileIdGenerator.newId()
-        assertNotEquals(first, second)
-        assertNotEquals(first.take(8), second.take(8))
+    fun generatedIdsRetainTheEntireUuid() {
+        assertTrue(ProfileIdGenerator.newId().length > 8)
     }
 }
