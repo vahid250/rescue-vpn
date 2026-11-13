@@ -72,13 +72,7 @@ class RescueWireGuardService : Service() {
         if (startJob?.isActive == true) return
 
         val existingBackend = backend
-        val existingTunnel = currentTunnel
-        if (existingBackend != null && existingTunnel != null &&
-            existingBackend.getState(existingTunnel) == Tunnel.State.UP
-        ) {
-            startStatsPolling(existingTunnel, existingBackend)
-            return
-        }
+        val previousTunnel = currentTunnel
 
         try {
             val normalizedConfig = WireGuardValidator.normalizeForWireGuard(rawConfig)
@@ -88,6 +82,8 @@ class RescueWireGuardService : Service() {
             val tunnel = object : Tunnel {
                 override fun getName(): String = name
                 override fun onStateChange(newState: Tunnel.State) {
+                    // Ignore callbacks from a tunnel that has already been replaced.
+                    if (currentTunnel !== this) return
                     when (newState) {
                         Tunnel.State.UP -> {
                             // وضعیت CONNECTED تنها پس از بالا آمدن واقعی اینترفیس در هسته لینوکس
@@ -115,6 +111,15 @@ class RescueWireGuardService : Service() {
             // and cause GoBackend's two-second startup timeout on the first attempt.
             startJob = serviceScope.launch(Dispatchers.IO) {
                 try {
+                    // A selected profile change must replace the running tunnel.
+                    // GoBackend can run only one active tunnel at a time, so stop the
+                    // previous tunnel before starting the newly selected configuration.
+                    if (previousTunnel != null &&
+                        previousTunnel !== tunnel &&
+                        activeBackend.getState(previousTunnel) == Tunnel.State.UP
+                    ) {
+                        activeBackend.setState(previousTunnel, Tunnel.State.DOWN, null)
+                    }
                     activeBackend.setState(tunnel, Tunnel.State.UP, parsedConfig)
                     startStatsPolling(tunnel, activeBackend)
                 } catch (e: Exception) {
