@@ -97,7 +97,7 @@ A stale result must not remain `VERIFIED` after reconnect, profile change, netwo
 ## Implementation gates, in order
 
 1. [Source change added; CI pending] Use SHA-256 over normalized configuration for the in-memory active-config identity; regression tests cover a known 32-bit hash collision. Verify command serialization and start/stop/switch races on CI and device.
-2. Add a pure profile-pinning policy with tests. Enforce it in both ViewModel and service command handling.
+2. [Pure policy and unit tests added; not wired into production yet] A standalone profile-pinning gate now blocks a different profile while a pin is present, permits the same pinned profile, and permits a switch only when the caller explicitly confirms unpin. Before production use, the pin must come from validated encrypted metadata and the rule must be enforced in both ViewModel and service command handling.
 3. Design encrypted, versioned profile metadata storage without changing the legacy raw-config read path. Test crash recovery and key loss before migration.
 4. Add a verifier that uses an explicitly bound socket on the active VPN network, strict HTTPS/TLS validation, short timeouts, response-size limits, narrow parsing, and no secret/device data in requests or logs.
 5. Bind each verification result to the exact profile/config/tunnel generation; invalidate it on every relevant transition.
@@ -115,4 +115,4 @@ A stale result must not remain `VERIFIED` after reconnect, profile change, netwo
 
 ## Review conclusion
 
-The collision-safe in-memory configuration identity and focused regression tests have been added on the development branch, but have not yet been executed by verified CI or on a device. The next safe task is to validate this change and then implement the pure profile-pinning policy with tests. Do not begin egress networking or storage migration until those foundations are reviewed. The existing encrypted store must remain intact throughout this work.
+The collision-safe in-memory configuration identity and its regression tests, plus a standalone profile-pinning policy and unit tests, have been added on the development branch. Neither test suite has yet been executed by verified CI or on a device. The pinning policy is intentionally not wired into production until its source of truth is securely persisted and both the ViewModel and service enforce it. The next safe task is to design and test the encrypted metadata record and migration strategy without altering existing WireGuard profile records. Do not begin egress networking or storage migration until those foundations are reviewed. The existing encrypted store must remain intact throughout this work.
