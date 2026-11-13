@@ -127,6 +127,7 @@ class RescueWireGuardService : Service() {
             }
         }
 
+        var attemptedTunnel: Tunnel? = null
         try {
             val normalized = WireGuardValidator.normalizeForWireGuard(rawConfig)
             val parsed = Config.parse(
@@ -151,6 +152,7 @@ class RescueWireGuardService : Service() {
                 }
             }
 
+            attemptedTunnel = tunnel
             // Publish the new identity before backend calls so callbacks from the
             // previous tunnel are ignored from this point onward.
             currentTunnel = tunnel
@@ -189,6 +191,17 @@ class RescueWireGuardService : Service() {
                 )
                 updateNotification("اتصال قبلی فعال است؛ تعویض سرور ناموفق بود")
             } else {
+                // A backend may fail after partially creating the new interface.
+                // Best-effort DOWN avoids leaving an untracked tunnel behind.
+                try {
+                    attemptedTunnel?.let { failedTunnel ->
+                        withContext(Dispatchers.IO) {
+                            activeBackend.setState(failedTunnel, Tunnel.State.DOWN, null)
+                        }
+                    }
+                } catch (_: Exception) {
+                    // Preserve the primary connection error; state remains FAILED.
+                }
                 currentTunnel = null
                 activeConfigFingerprint = null
                 failStart(e)
