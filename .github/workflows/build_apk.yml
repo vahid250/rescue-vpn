@@ -13,6 +13,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Avoid wasting runners on obsolete commits during rapid development pushes.
+concurrency:
+  group: rma-android-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
