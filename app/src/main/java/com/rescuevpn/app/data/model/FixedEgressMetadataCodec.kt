@@ -96,11 +96,13 @@ internal object FixedEgressMetadataCodec {
         val decoder = StandardCharsets.UTF_8.newDecoder()
             .onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT)
-        return try {
+        val decoded = try {
             decoder.decode(ByteBuffer.wrap(bytes)).toString()
         } catch (error: Exception) {
             throw IllegalArgumentException("Metadata value is not valid UTF-8.", error)
         }
+        require(encodeText(decoded) == value) { "Metadata value is not canonically encoded." }
+        return decoded
     }
 
     private inline fun <reified T : Enum<T>> enumValueOrThrow(value: String): T =
