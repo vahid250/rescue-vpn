@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import com.rescuevpn.app.core.vpn.RescueWireGuardService
 import com.rescuevpn.app.core.vpn.TunnelStateManager
 import com.rescuevpn.app.core.vpn.VpnConnectionState
+import com.rescuevpn.app.data.model.ProfileIdGenerator
 import com.rescuevpn.app.data.model.WireGuardProfile
 import com.rescuevpn.app.data.model.WireGuardValidator
 import com.rescuevpn.app.data.security.SecureConfigStore
