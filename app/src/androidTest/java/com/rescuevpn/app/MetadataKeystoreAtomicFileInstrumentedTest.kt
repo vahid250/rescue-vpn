@@ -37,6 +37,15 @@ class MetadataKeystoreAtomicFileInstrumentedTest {
             store.save(profileId, expected)
             assertEquals(expected, store.load(profileId))
 
+            // A separately constructed provider/store must reuse the same persisted Keystore key.
+            val secondProvider = AndroidKeystoreMetadataKeyProvider(alias)
+            assertNotNull(secondProvider.getExistingKey())
+            val secondStore = EncryptedMetadataRecordStore(
+                AndroidAtomicRecordFileFactory(context),
+                secondProvider
+            )
+            assertEquals(expected, secondStore.load(profileId))
+
             store.delete(profileId)
             assertNull(store.load(profileId))
         } finally {
