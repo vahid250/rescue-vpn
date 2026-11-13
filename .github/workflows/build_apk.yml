@@ -41,9 +41,13 @@ jobs:
       - name: Run Android Keystore and AtomicFile device tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          # API 34 is a stable emulator target for this minSdk 26 test suite.
+          api-level: 34
           arch: x86_64
           profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+          emulator-boot-timeout: 900
           script: gradle :app:connectedDebugAndroidTest --stacktrace
       - name: Android lint
         run: gradle :app:lintDebug --stacktrace
