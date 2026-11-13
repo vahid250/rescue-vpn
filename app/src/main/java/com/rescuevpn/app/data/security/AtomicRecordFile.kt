@@ -1,5 +1,6 @@
 package com.rescuevpn.app.data.security
 
+import android.content.Context
 import android.util.AtomicFile
 import java.io.File
 import java.io.FileNotFoundException
@@ -21,8 +22,10 @@ internal fun interface AtomicRecordFileFactory {
  * the previous complete ciphertext if a write is interrupted.
  */
 internal class AndroidAtomicRecordFileFactory(
-    private val directory: File
+    context: Context
 ) : AtomicRecordFileFactory {
+
+    private val directory = File(context.noBackupFilesDir, DIRECTORY_NAME)
 
     override fun forProfile(profileId: String): AtomicRecordFile {
         require(profileId.isNotBlank() && profileId.length <= MAX_PROFILE_ID_CHARS &&
@@ -40,6 +43,7 @@ internal class AndroidAtomicRecordFileFactory(
 
     private companion object {
         const val MAX_PROFILE_ID_CHARS = 128
+        const val DIRECTORY_NAME = "fixed_egress_metadata"
     }
 }
 
