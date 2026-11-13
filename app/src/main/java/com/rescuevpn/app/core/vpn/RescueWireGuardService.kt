@@ -30,16 +30,11 @@ class RescueWireGuardService : Service() {
         private const val NOTIFICATION_ID = 1001
     }
 
-    private sealed interface Command {
-        data class Start(val name: String, val rawConfig: String) : Command
-        data class Stop(val startId: Int) : Command
-    }
-
     private var backend: GoBackend? = null
     @Volatile private var currentTunnel: Tunnel? = null
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(serviceJob + Dispatchers.Main.immediate)
-    private val commands = Channel<Command>(Channel.UNLIMITED)
+    private val commands = Channel<TunnelCommand>(Channel.UNLIMITED)
     private var commandJob: Job? = null
     private var timerJob: Job? = null
     private var statsJob: Job? = null
@@ -60,14 +55,15 @@ class RescueWireGuardService : Service() {
                 // Collapse requests that arrived during the previous transition.
                 // The newest user intent wins: a final Stop cancels queued starts,
                 // while a later Start intentionally supersedes an earlier Stop.
-                var latestCommand = firstCommand
+                val queuedCommands = mutableListOf(firstCommand)
                 while (true) {
                     val queued = commands.tryReceive().getOrNull() ?: break
-                    latestCommand = queued
+                    queuedCommands += queued
                 }
-                when (val command = latestCommand) {
-                    is Command.Start -> handleStart(command.name, command.rawConfig)
-                    is Command.Stop -> handleStop(command.startId)
+                when (val command = TunnelCommandPolicy.latest(queuedCommands)) {
+                    is TunnelCommand.Start -> handleStart(command.name, command.rawConfig)
+                    is TunnelCommand.Stop -> handleStop(command.startId)
+                    null -> Unit
                 }
             }
         }
@@ -83,7 +79,7 @@ class RescueWireGuardService : Service() {
                     TunnelStateManager.setLastError("کانفیگ معتبری برای برقراری تونل ارائه نشده است.")
                 } else {
                     startForeground(NOTIFICATION_ID, buildNotification("در صف برقراری تونل WireGuard..."))
-                    val result = commands.trySend(Command.Start(name, raw))
+                    val result = commands.trySend(TunnelCommand.Start(name, raw))
                     if (result.isFailure) {
                         TunnelStateManager.setState(VpnConnectionState.FAILED)
                         TunnelStateManager.setLastError("صف فرمان‌های اتصال در دسترس نیست.")
@@ -92,7 +88,7 @@ class RescueWireGuardService : Service() {
                 }
             }
             ACTION_STOP -> {
-                val result = commands.trySend(Command.Stop(startId))
+                val result = commands.trySend(TunnelCommand.Stop(startId))
                 if (result.isFailure) {
                     TunnelStateManager.setLastError("فرمان قطع تونل ثبت نشد؛ لطفاً دوباره تلاش کنید.")
                 }
