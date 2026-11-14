@@ -38,6 +38,7 @@ fun MainDashboardScreen(
     onNavigateAbout: () -> Unit,
     onPanicWipe: () -> Unit
 ) {
+    var showWipeConfirmation by remember { mutableStateOf(false) }
     val isConnected = state == VpnConnectionState.CONNECTED
     val isConnecting = state == VpnConnectionState.CONNECTING
     // durationSeconds changes once per second while connected, so this age display
@@ -90,7 +91,7 @@ fun MainDashboardScreen(
                     IconButton(onClick = onNavigateAbout) {
                         Icon(Icons.Default.Info, contentDescription = "درباره", tint = TextSecondary)
                     }
-                    IconButton(onClick = onPanicWipe) {
+                    IconButton(onClick = { showWipeConfirmation = true }) {
                         Icon(Icons.Default.DeleteForever, contentDescription = "امحای داده‌ها", tint = DangerRed)
                     }
                 }
@@ -252,6 +253,41 @@ fun MainDashboardScreen(
             }
         }
     }
+
+    if (showWipeConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showWipeConfirmation = false },
+            containerColor = SurfaceCard,
+            icon = {
+                Icon(Icons.Default.Warning, contentDescription = null, tint = DangerRed)
+            },
+            title = {
+                Text("حذف همهٔ کانفیگ‌ها و اطلاعات؟", color = TextPrimary)
+            },
+            text = {
+                Text(
+                    "این کار اتصال VPN را قطع می‌کند و تمام کانفیگ‌های ذخیره‌شده و اطلاعات برنامه را حذف می‌کند. این عملیات قابل بازگشت نیست. آیا مطمئن هستید؟",
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showWipeConfirmation = false
+                        onPanicWipe()
+                    }
+                ) {
+                    Text("بله، همه را حذف کن", color = DangerRed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWipeConfirmation = false }) {
+                    Text("انصراف", color = TextPrimary)
+                }
+            }
+        )
+    }
+
 }
 
 private fun formatTraffic(bytes: Long): String {
